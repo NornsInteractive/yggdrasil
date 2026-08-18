@@ -9,7 +9,7 @@ import { adminAuthMiddleware } from '../middleware/auth';
 
 export const adminSettingsRoutes = new Hono<{ Bindings: Env }>();
 
-adminSettingsRoutes.use('*', adminAuthMiddleware);
+adminSettingsRoutes.use('/api/admin/*', adminAuthMiddleware);
 
 /**
  * 获取所有动态系统配置

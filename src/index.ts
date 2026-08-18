@@ -19,20 +19,9 @@ const app = new Hono<{ Bindings: Env }>();
 // 1. 全局 CORS 处理
 app.use('*', corsMiddleware);
 
-// 2. 挂载客户端对外 API
-app.route('/', clientAppRoutes);
-app.route('/', clientFilesRoutes);
-
-// 3. 挂载管理员后台 API
-app.route('/', adminAuthRoutes);
-app.route('/', adminAppsRoutes);
-app.route('/', adminFilesRoutes);
-app.route('/', adminUploadRoutes);
-app.route('/', adminSettingsRoutes);
-
-// 4. Web 控制台前端页面路由
+// 2. Web 控制台前端页面路由 (直接返回单页 Web Dashboard)
 const serveDashboard = (c: any) => {
-  const siteTitle = c.env.APP_NAME 
+  const siteTitle = c.env?.APP_NAME 
     ? `${c.env.APP_NAME} - 分发管理中心` 
     : 'Yggdrasil - 应用与文件分发管理中心';
   return c.html(renderDashboardHtml(siteTitle));
@@ -41,6 +30,17 @@ const serveDashboard = (c: any) => {
 app.get('/', serveDashboard);
 app.get('/admin', serveDashboard);
 app.get('/dashboard', serveDashboard);
+
+// 3. 挂载客户端对外 API
+app.route('/', clientAppRoutes);
+app.route('/', clientFilesRoutes);
+
+// 4. 挂载管理员后台 API
+app.route('/', adminAuthRoutes);
+app.route('/', adminAppsRoutes);
+app.route('/', adminFilesRoutes);
+app.route('/', adminUploadRoutes);
+app.route('/', adminSettingsRoutes);
 
 // 5. 健康检查接口
 app.get('/health', (c) => {

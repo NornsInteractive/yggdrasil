@@ -9,8 +9,8 @@ import { adminAuthMiddleware } from '../middleware/auth';
 
 export const adminAppsRoutes = new Hono<{ Bindings: Env }>();
 
-// 统一施加管理员鉴权
-adminAppsRoutes.use('*', adminAuthMiddleware);
+// 统一施加管理员鉴权 (仅作用于 /api/admin/* 接口)
+adminAppsRoutes.use('/api/admin/*', adminAuthMiddleware);
 
 /**
  * 获取所有应用列表

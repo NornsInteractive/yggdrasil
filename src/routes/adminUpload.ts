@@ -9,7 +9,7 @@ import { adminAuthMiddleware } from '../middleware/auth';
 
 export const adminUploadRoutes = new Hono<{ Bindings: Env }>();
 
-adminUploadRoutes.use('*', adminAuthMiddleware);
+adminUploadRoutes.use('/api/admin/*', adminAuthMiddleware);
 
 /**
  * 标准表单直传 (适用于常规大小文件/APK)

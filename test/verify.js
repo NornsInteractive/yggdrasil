@@ -166,8 +166,26 @@ assert.strictEqual(checkTokenAuth(mockConfig, 'app_download', '').allowed, true)
 assert.strictEqual(checkTokenAuth(mockConfig, 'file_download', '').allowed, false);
 console.log('  ✅ Dynamic Token Guard logic verified.');
 
+// 7. 验证根路径访问与 Web 控制台渲染不会被 401 拦截
+console.log('▶ Test 7: Verifying GET / and Dashboard routes return HTTP 200 without 401 intercept');
+async function testAppRouting() {
+  const { default: app } = await import('../dist/worker.js');
+  const rootRes = await app.fetch(new Request('http://localhost/'), { APP_NAME: 'Yggdrasil' });
+  assert.strictEqual(rootRes.status, 200, 'GET / should return 200 OK');
+  const rootHtml = await rootRes.text();
+  assert(rootHtml.includes('Yggdrasil 控制台'), 'GET / should render the dashboard HTML');
+
+  const adminRes = await app.fetch(new Request('http://localhost/admin'), { APP_NAME: 'Yggdrasil' });
+  assert.strictEqual(adminRes.status, 200, 'GET /admin should return 200 OK');
+
+  const healthRes = await app.fetch(new Request('http://localhost/health'), {});
+  assert.strictEqual(healthRes.status, 200, 'GET /health should return 200 OK');
+  console.log('  ✅ GET /, /admin, /health routing verified returning HTTP 200 with HTML.');
+}
+
 async function main() {
   await testJwt();
+  await testAppRouting();
   console.log('\n🎉 ALL SYSTEM TESTS PASSED SUCCESSFULLY! 🚀\n');
 }
 
