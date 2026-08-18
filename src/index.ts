@@ -19,6 +19,30 @@ const app = new Hono<{ Bindings: Env }>();
 // 1. 全局 CORS 处理
 app.use('*', corsMiddleware);
 
+// 2. 检查 Cloudflare D1 与 R2 资源绑定是否已在控制台配置
+app.use('/api/*', async (c, next) => {
+  // 登录与登出不需要 D1
+  if (c.req.path === '/api/admin/login' || c.req.path === '/api/admin/logout') {
+    return await next();
+  }
+
+  if (!c.env || !c.env.DB) {
+    return c.json({
+      code: 500,
+      message: '【Cloudflare 绑定缺失】未检测到 D1 数据库绑定。请前往 Cloudflare 控制台 -> Workers -> yggdrasil -> Settings -> Bindings -> 添加 D1 数据库绑定，变量名称必须填写为 "DB"（大写），并选择您的 D1 数据库（如 ygg-db）。',
+    }, 500);
+  }
+
+  if (c.req.path.startsWith('/api/admin/upload') && !c.env.BUCKET) {
+    return c.json({
+      code: 500,
+      message: '【Cloudflare 绑定缺失】未检测到 R2 存储桶绑定。请前往 Cloudflare 控制台 -> Workers -> yggdrasil -> Settings -> Bindings -> 添加 R2 存储桶绑定，变量名称必须填写为 "BUCKET"（大写），并选择您的 R2 桶（如 ygg-storage）。',
+    }, 500);
+  }
+
+  await next();
+});
+
 // 2. Web 控制台前端页面路由 (直接返回单页 Web Dashboard)
 const serveDashboard = (c: any) => {
   const siteTitle = c.env?.APP_NAME 
