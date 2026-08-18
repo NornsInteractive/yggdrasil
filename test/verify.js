@@ -14,17 +14,20 @@ const bundle = readFileSync('dist/worker.js', 'utf-8');
 assert(bundle.length > 10000, 'dist/worker.js should contain compiled worker bundle');
 console.log(`  ✅ dist/worker.js exists and is valid (${(bundle.length / 1024).toFixed(2)} KB)`);
 
-// 2. 验证 schema.sql 语句完整性
-console.log('▶ Test 2: Verifying D1 database schema.sql');
+// 2. 验证 schema.sql 和 schema.clean.sql 语句完整性
+console.log('▶ Test 2: Verifying D1 database schema.sql and schema.clean.sql');
 assert(existsSync('schema.sql'), 'schema.sql must exist');
+assert(existsSync('schema.clean.sql'), 'schema.clean.sql must exist');
 const schema = readFileSync('schema.sql', 'utf-8');
+const cleanSchema = readFileSync('schema.clean.sql', 'utf-8');
+assert(!cleanSchema.includes('--'), 'schema.clean.sql must not contain any comment syntax');
 assert(schema.includes('CREATE TABLE IF NOT EXISTS apps'), 'schema.sql must contain apps table');
 assert(schema.includes('CREATE TABLE IF NOT EXISTS app_versions'), 'schema.sql must contain app_versions table');
 assert(schema.includes('CREATE TABLE IF NOT EXISTS files'), 'schema.sql must contain files table');
 assert(schema.includes('CREATE TABLE IF NOT EXISTS system_settings'), 'schema.sql must contain system_settings table');
 assert(schema.includes('api_token_enabled'), 'schema.sql must contain default settings');
 assert(schema.includes('api_fixed_token'), 'schema.sql must contain api_fixed_token default');
-console.log('  ✅ schema.sql table definitions and default records verified.');
+console.log('  ✅ schema.sql and schema.clean.sql verified.');
 
 // 3. 验证 Web Crypto JWT 算法
 console.log('▶ Test 3: Verifying Web Crypto JWT Sign & Verify Logic');

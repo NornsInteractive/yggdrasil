@@ -43,7 +43,7 @@
 2. 点击 **Create database** -> 选择 **Dashboard**。
 3. 数据库名称输入：`ygg-db` -> 点击 **Create**。
 4. 创建完成后进入 `ygg-db` 详情页，切换到 **Console**（控制台）标签页。
-5. 打开本项目中的 [`schema.sql`](file:///workspace/projects/yggdrasil/schema.sql) 文件，复制其全部内容，粘贴到 D1 控制台输入框中，点击 **Execute** 执行初始化建表。
+5. 打开本项目中的纯净无注释 SQL 文件 [`schema.clean.sql`](file:///workspace/projects/yggdrasil/schema.clean.sql)（或带注释版 [`schema.sql`](file:///workspace/projects/yggdrasil/schema.sql)），复制其全部内容，粘贴到 D1 控制台输入框中，点击 **Execute** 执行初始化建表。
 
 ---
 
