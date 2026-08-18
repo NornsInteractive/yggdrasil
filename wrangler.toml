@@ -3,13 +3,5 @@ main = "src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
+# 保留控制台设置的环境变量与 Secrets
 keep_vars = true
-
-[[d1_databases]]
-binding = "DB"
-database_name = "ygg-db"
-database_id = "ygg-db"
-
-[[r2_buckets]]
-binding = "BUCKET"
-bucket_name = "ygg-storage"
