@@ -1,0 +1,30 @@
+# ==============================================================================
+# Yggdrasil (ygg) - Wrangler 配置文件参考模版
+# ==============================================================================
+# 如果使用 wrangler 命令行进行部署与本地调试，请将此文件重命名或复制为 wrangler.toml
+# 并填入您在 Cloudflare 控制台创建的 D1 数据库 ID 和 R2 存储桶名称。
+# ==============================================================================
+
+name = "yggdrasil"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# 1. 绑定 D1 数据库
+# 变量名必须为 DB
+[[d1_databases]]
+binding = "DB"
+database_name = "ygg-db"
+database_id = "YOUR_D1_DATABASE_ID" # 填入 Cloudflare 控制台中 D1 的 Database ID
+
+# 2. 绑定 R2 存储桶
+# 变量名必须为 BUCKET
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "ygg-storage"        # 填入 Cloudflare 控制台中创建的 R2 桶名
+
+# 3. 环境变量配置
+[vars]
+APP_NAME = "Yggdrasil"
+ADMIN_PASSWORD = "admin"           # 默认管理员登录密码 (生产环境请务必修改或在控制台设为 Secret)
+JWT_SECRET = "ygg_jwt_secret_change_me_in_production"

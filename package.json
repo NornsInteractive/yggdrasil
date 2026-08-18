@@ -1,0 +1,32 @@
+{
+  "name": "yggdrasil",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Cloudflare-native App release management and file distribution system (ygg)",
+  "main": "dist/worker.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "node build.js",
+    "deploy": "wrangler deploy",
+    "test": "node test/verify.js"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "r2",
+    "d1",
+    "app-distribution",
+    "apk-release",
+    "resumable-download"
+  ],
+  "author": "dev",
+  "license": "MIT",
+  "dependencies": {
+    "hono": "^4.7.2"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250224.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.3"
+  }
+}
