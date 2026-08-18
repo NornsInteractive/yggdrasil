@@ -12,7 +12,7 @@ import { adminAppsRoutes } from './routes/adminApps';
 import { adminFilesRoutes } from './routes/adminFiles';
 import { adminUploadRoutes } from './routes/adminUpload';
 import { adminSettingsRoutes } from './routes/adminSettings';
-import { renderDashboardHtml } from './views/dashboard.html';
+import { renderDashboardHtml } from './views/dashboard';
 
 const app = new Hono<{ Bindings: Env }>();
 
