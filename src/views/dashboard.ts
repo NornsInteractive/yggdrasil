@@ -777,6 +777,9 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
         <div class="nav-tab" data-tab="playground" onclick="switchTab('playground')">
           <span>🧪</span> <span>接口调试台</span>
         </div>
+        <div class="nav-tab" data-tab="docs" onclick="switchTab('docs')">
+          <span>📖</span> <span>API 文档</span>
+        </div>
       </nav>
 
       <div class="nav-user">
@@ -963,6 +966,155 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
             <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 1rem;">📦 响应结果 (JSON)</h3>
             <div id="pg-response" class="code-box" style="min-height: 280px; white-space: pre-wrap;">点击左侧按钮发起测试...</div>
           </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: 完整 API 文档 -->
+      <section id="tab-docs" class="hidden">
+        <div class="section-header">
+          <div>
+            <h2 class="section-title">API 接口参考文档</h2>
+            <p class="section-subtitle">详细的接口协议、参数说明、状态码与移动端多语言客户端接入代码</p>
+          </div>
+        </div>
+
+        <!-- 接口 1: 版本检测 -->
+        <div class="stat-card" style="margin-bottom: 1.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="badge badge-success" style="font-weight: 700;">GET</span>
+              <span class="mono" style="font-size: 1rem; font-weight: 700;">/api/v1/app/latest</span>
+              <span style="color: var(--text-muted); font-size: 0.85rem;">(别名: /api/v1/version/check)</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="copyText(window.location.origin + '/api/v1/app/latest', '接口路径已复制')">复制 URL</button>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+            供手机 App 启动时或点击“检查更新”时调用。服务端根据传入的 <code class="mono">version_code</code> 自动判断是否存在新版本及是否强制更新。
+          </p>
+
+          <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-main);">请求参数 (Query String)</h4>
+          <table class="data-table" style="margin-bottom: 1rem;">
+            <thead>
+              <tr>
+                <th>参数名</th>
+                <th>类型</th>
+                <th>必填</th>
+                <th>说明</th>
+                <th>示例</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="mono">app_id</td>
+                <td>String</td>
+                <td><span class="badge badge-warning">是</span></td>
+                <td>应用包名或唯一标识</td>
+                <td class="mono">com.example.app</td>
+              </tr>
+              <tr>
+                <td class="mono">version_code</td>
+                <td>Integer</td>
+                <td>否</td>
+                <td>客户端当前安装的版本号 (整数)</td>
+                <td class="mono">10000</td>
+              </tr>
+              <tr>
+                <td class="mono">channel</td>
+                <td>String</td>
+                <td>否</td>
+                <td>渠道标识，默认 default</td>
+                <td class="mono">default / beta</td>
+              </tr>
+              <tr>
+                <td class="mono">token</td>
+                <td>String</td>
+                <td>否</td>
+                <td>若开启了 Token 校验，可在此或 Header 传入</td>
+                <td class="mono">ygg_sec_xxx</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h4 style="font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-main);">成功响应示例 (JSON)</h4>
+          <div class="code-box">{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "has_update": true,          // 是否有更新 (latest_version_code > current_version_code)
+    "is_force": false,           // 是否强制更新 (标记强更或低于最低兼容版本)
+    "app_id": "com.example.app",
+    "app_name": "掌上办公",
+    "icon_url": "https://example.com/icon.png",
+    "current_version_code": 10000,
+    "latest_version_code": 10200,
+    "latest_version_name": "1.2.0",
+    "min_version_code": 10000,
+    "channel": "default",
+    "changelog": "- 优化文件下载速度\n- 修复已知崩溃Bug",
+    "download_url": "https://your-worker.workers.dev/api/v1/app/download?app_id=com.example.app&version_code=10200",
+    "file_name": "app-v1.2.0.apk",
+    "file_size": 45829104,
+    "file_md5": "e10adc3949ba59abbe56e057f20f883e",
+    "release_time": "2026-08-18T10:00:00Z"
+  }
+}</div>
+        </div>
+
+        <!-- 接口 2: APK 下载 -->
+        <div class="stat-card" style="margin-bottom: 1.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="badge badge-success" style="font-weight: 700;">GET</span>
+              <span class="mono" style="font-size: 1rem; font-weight: 700;">/api/v1/app/download</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="copyText(window.location.origin + '/api/v1/app/download', '接口路径已复制')">复制 URL</button>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem;">
+            APK 安装包下载接口。原生支持 <b>HTTP Range 206 断点续传</b>，兼容 Android 系统自带 DownloadManager、OkHttp、iOS 下载组件及各大下载器。
+          </p>
+          <div class="code-box"># 断点续传测试 (分片请求 Range: bytes=0-1023)
+curl -i -H "Range: bytes=0-1023" "https://your-worker.workers.dev/api/v1/app/download?app_id=com.example.app"
+
+# 返回响应头:
+HTTP/1.1 206 Partial Content
+Content-Type: application/vnd.android.package-archive
+Accept-Ranges: bytes
+Content-Range: bytes 0-1023/45829104
+Content-Length: 1024</div>
+        </div>
+
+        <!-- 接口 3: 通用文件 -->
+        <div class="stat-card" style="margin-bottom: 1.5rem;">
+          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem;">📁 通用文件下载与检测接口</h3>
+          <ul style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.8; margin-left: 1.25rem;">
+            <li><b>元数据检测</b>: <code class="mono">GET /api/v1/files/check?alias=xxx</code> 或 <code class="mono">GET /api/v1/files/:id/check</code></li>
+            <li><b>通过 ID 下载</b>: <code class="mono">GET /api/v1/files/:id/download</code></li>
+            <li><b>通过短链别名下载</b>: <code class="mono">GET /f/:alias</code> (例如: <code class="mono">/f/my-config</code>)</li>
+          </ul>
+        </div>
+
+        <!-- 客户端接入代码 -->
+        <div class="stat-card">
+          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem;">💻 客户端接入代码模版 (Android Kotlin)</h3>
+          <div class="code-box" style="max-height: 380px;">// 1. 版本检测
+val url = "https://your-worker.workers.dev/api/v1/app/latest?app_id=com.example.app&version_code=10000"
+val request = Request.Builder().url(url).addHeader("X-Ygg-Token", "your_token").build()
+
+client.newCall(request).enqueue(object : Callback {
+    override fun onResponse(call: Call, response: Response) {
+        val json = JSONObject(response.body?.string() ?: "")
+        val data = json.getJSONObject("data")
+        val hasUpdate = data.getBoolean("has_update")
+        val downloadUrl = data.getString("download_url")
+        // 若有更新，引导用户下载或自动拉起下载
+    }
+})
+
+// 2. 断点续传下载
+val downloadReq = Request.Builder()
+    .url(downloadUrl)
+    .addHeader("Range", "bytes=\${existingFile.length()}-")
+    .build()</div>
         </div>
       </section>
     </main>
@@ -1175,7 +1327,7 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
       document.querySelectorAll('.nav-tab').forEach(el => {
         el.classList.toggle('active', el.getAttribute('data-tab') === tabId);
       });
-      ['apps', 'files', 'settings', 'playground'].forEach(t => {
+      ['apps', 'files', 'settings', 'playground', 'docs'].forEach(t => {
         const el = document.getElementById('tab-' + t);
         if (el) el.classList.toggle('hidden', t !== tabId);
       });
