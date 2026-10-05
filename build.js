@@ -29,10 +29,13 @@ async function build() {
     },
   });
 
+  // 同时输出 dist/_worker.js 以兼容 Cloudflare Pages Advanced Mode
+  fs.copyFileSync('dist/worker.js', 'dist/_worker.js');
+
   const stats = fs.statSync('dist/worker.js');
   console.log(`✅ Build completed successfully!`);
-  console.log(`📁 Output file: dist/worker.js (${(stats.size / 1024).toFixed(2)} KB)`);
-  console.log(`💡 You can directly copy the contents of dist/worker.js and paste it into Cloudflare Worker Web Editor to deploy.`);
+  console.log(`📁 Output files: dist/worker.js & dist/_worker.js (${(stats.size / 1024).toFixed(2)} KB)`);
+  console.log(`💡 Cloudflare Workers 使用 dist/worker.js，Cloudflare Pages 使用 dist/_worker.js。`);
 }
 
 build().catch((err) => {
