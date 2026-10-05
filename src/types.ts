@@ -38,6 +38,9 @@ export interface AppVersionEntity {
   is_force_update: number; // 0 or 1
   is_published: number;    // 0 or 1
   download_count: number;
+  external_url?: string | null; // 第三方外部直链下载地址
+  use_proxy?: number;           // 是否开启反向代理 (0=302重定向跳转, 1=反向代理流式传输)
+  is_cleaned?: number;          // 安装包是否已被自动清理策略清理 (0=正常存在, 1=已清理但保留版本日志)
   created_at?: string;
 }
 

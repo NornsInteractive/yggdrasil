@@ -1203,8 +1203,17 @@ val downloadReq = Request.Builder()
       <form id="form-release-version" onsubmit="handleReleaseVersion(event)">
         <input type="hidden" id="ver-form-appid" />
         
-        <!-- 上传区域 -->
+        <!-- 安装包来源切换 -->
         <div class="form-group">
+          <label class="form-label">安装包来源方式 *</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <button type="button" id="pkg-mode-upload" class="btn btn-primary btn-sm" onclick="switchPackageMode('upload')" style="flex: 1;">📦 上传 APK 到 R2 存储</button>
+            <button type="button" id="pkg-mode-external" class="btn btn-secondary btn-sm" onclick="switchPackageMode('external')" style="flex: 1;">🌐 填写第三方直链 (免上传)</button>
+          </div>
+        </div>
+
+        <!-- 模式 1: R2 本地文件上传 -->
+        <div id="pkg-sec-upload" class="form-group">
           <label class="form-label">选择 APK 安装包 *</label>
           <div id="drop-apk-zone" class="upload-zone" onclick="document.getElementById('file-apk-input').click()">
             <div class="upload-icon">📦</div>
@@ -1216,6 +1225,32 @@ val downloadReq = Request.Builder()
             <div id="apk-progress-bar" class="progress-bar-inner"></div>
           </div>
           <div id="apk-upload-status" class="form-help" style="margin-top: 6px;"></div>
+        </div>
+
+        <!-- 模式 2: 第三方直链与反代设置 -->
+        <div id="pkg-sec-external" class="form-group hidden">
+          <label class="form-label">第三方 APK 下载直链 (URL) *</label>
+          <input type="url" id="ver-form-exturl" class="form-control mono" placeholder="https://cdn.example.com/apps/app-v1.2.0.apk" oninput="checkReleaseSubmitReady()" />
+          <div class="form-help">可填入 CDN、GitHub Release、网盘直链等任何可以直接下载的外部链接</div>
+
+          <div class="switch-wrap" style="margin-top: 0.75rem;">
+            <div class="switch-info">
+              <span class="switch-title">开启边缘反向代理加速 (Reverse Proxy)</span>
+              <span class="switch-desc">默认关闭为 302 重定向跳转到第三方下载；开启后由当前 Worker 节点代理流式传输，隐藏源站真实 IP 并支持断点续传</span>
+            </div>
+            <input type="checkbox" id="ver-form-useproxy" class="switch-checkbox" />
+          </div>
+
+          <div class="form-row" style="margin-top: 0.75rem;">
+            <div class="form-col form-group">
+              <label class="form-label">文件名 (可选)</label>
+              <input type="text" id="ver-form-extfilename" class="form-control" placeholder="如 app-v1.2.0.apk" />
+            </div>
+            <div class="form-col form-group">
+              <label class="form-label">文件大小 (字节，可选)</label>
+              <input type="number" id="ver-form-extsize" class="form-control mono" placeholder="如 45829104" />
+            </div>
+          </div>
         </div>
 
         <div class="form-row">
@@ -1636,8 +1671,12 @@ val downloadReq = Request.Builder()
 
           content.innerHTML = versions.map(v => {
             const downloadUrl = \`\${window.location.origin}/api/v1/app/download?app_id=\${encodeURIComponent(v.app_id)}&version_code=\${v.version_code}\`;
+            const isCleaned = v.is_cleaned === 1;
+            const isExternal = !!v.external_url;
+            const useProxy = v.use_proxy === 1;
+
             return \`
-              <div class="version-item">
+              <div class="version-item" style="\${isCleaned ? 'opacity: 0.9; border-left: 3px solid #f59e0b;' : ''}">
                 <div class="ver-left">
                   <div class="ver-header">
                     <span class="ver-title">v\${v.version_name}</span>
@@ -1645,19 +1684,26 @@ val downloadReq = Request.Builder()
                     <span class="badge badge-accent">\${v.channel}</span>
                     \${v.is_force_update ? '<span class="badge badge-warning">强制更新</span>' : ''}
                     \${v.is_published ? '<span class="badge badge-success">已发布</span>' : '<span class="badge">已下架</span>'}
+                    \${isCleaned ? '<span class="badge badge-warning" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;">📦 安装包已清理</span>' : ''}
+                    \${isExternal ? \`<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">🌐 第三方外链\${useProxy ? ' (反代)' : ''}</span>\` : ''}
                   </div>
                   \${v.changelog ? \`<div class="ver-log">\${v.changelog}</div>\` : ''}
                   <div class="ver-meta">
-                    <span>文件: \${v.file_name} (\${formatBytes(v.file_size)})</span>
+                    <span>文件: \${v.file_name || 'app.apk'} \${v.file_size ? \`(\${formatBytes(v.file_size)})\` : ''}</span>
                     <span>下载量: \${v.download_count} 次</span>
                     <span>发布于: \${v.created_at ? v.created_at.substring(0, 19).replace('T', ' ') : ''}</span>
                     \${v.file_md5 ? \`<span>MD5: \${v.file_md5}</span>\` : ''}
+                    \${isExternal ? \`<span style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">外链: <a href="\${v.external_url}" target="_blank" style="color: #38bdf8;">\${v.external_url}</a></span>\` : ''}
                   </div>
+                  \${isCleaned ? '<div style="font-size: 0.75rem; color: #fbbf24; margin-top: 4px;">⚠️ 该版本历史 APK 已被存储自动清理策略物理清理，历史发布记录完整保留。</div>' : ''}
                 </div>
 
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
-                  <button class="btn btn-secondary btn-sm" onclick="copyText('\${downloadUrl}', '指定版本下载链接已复制')">复制下载链接</button>
-                  <button class="btn btn-danger btn-sm" onclick="deleteVersion('\${v.id}', '\${v.app_id}')">删除</button>
+                  \${isCleaned 
+                    ? '<button class="btn btn-secondary btn-sm" disabled style="opacity: 0.5; cursor: not-allowed;" title="安装包已被自动策略清理">安装包已清理</button>'
+                    : \`<button class="btn btn-secondary btn-sm" onclick="copyText('\${downloadUrl}', '指定版本下载链接已复制')">复制下载链接</button>\`
+                  }
+                  <button class="btn btn-danger btn-sm" onclick="deleteVersion('\${v.id}', '\${v.app_id}')">删除记录</button>
                 </div>
               </div>
             \`;
@@ -1686,6 +1732,43 @@ val downloadReq = Request.Builder()
     }
 
     // Release Version Modal & Upload
+    let currentPkgMode = 'upload';
+    function switchPackageMode(mode) {
+      currentPkgMode = mode;
+      const btnUpload = document.getElementById('pkg-mode-upload');
+      const btnExt = document.getElementById('pkg-mode-external');
+      const secUpload = document.getElementById('pkg-sec-upload');
+      const secExt = document.getElementById('pkg-sec-external');
+
+      if (btnUpload && btnExt && secUpload && secExt) {
+        if (mode === 'upload') {
+          btnUpload.className = 'btn btn-primary btn-sm';
+          btnExt.className = 'btn btn-secondary btn-sm';
+          secUpload.classList.remove('hidden');
+          secExt.classList.add('hidden');
+        } else {
+          btnUpload.className = 'btn btn-secondary btn-sm';
+          btnExt.className = 'btn btn-primary btn-sm';
+          secUpload.classList.add('hidden');
+          secExt.classList.remove('hidden');
+        }
+      }
+      checkReleaseSubmitReady();
+    }
+
+    function checkReleaseSubmitReady() {
+      const submitBtn = document.getElementById('btn-release-submit');
+      if (!submitBtn) return;
+      if (currentPkgMode === 'external') {
+        const url = document.getElementById('ver-form-exturl')?.value.trim();
+        submitBtn.disabled = !url;
+        submitBtn.innerText = '发布新版本 (第三方直链)';
+      } else {
+        submitBtn.disabled = !pendingUploadResult;
+        submitBtn.innerText = '上传并发布新版本';
+      }
+    }
+
     function openReleaseModal(appId, appName) {
       pendingUploadResult = null;
       document.getElementById('ver-modal-title').innerText = \`发布新版本 - \${appName}\`;
@@ -1696,11 +1779,15 @@ val downloadReq = Request.Builder()
       document.getElementById('ver-form-channel').value = 'default';
       document.getElementById('ver-form-log').value = '';
       document.getElementById('ver-form-force').checked = false;
+      document.getElementById('ver-form-exturl').value = '';
+      document.getElementById('ver-form-useproxy').checked = false;
+      document.getElementById('ver-form-extfilename').value = '';
+      document.getElementById('ver-form-extsize').value = '';
       document.getElementById('drop-apk-text').innerText = '点击或将 APK 文件拖拽至此区域';
       document.getElementById('apk-progress-wrap').style.display = 'none';
       document.getElementById('apk-upload-status').innerText = '';
-      document.getElementById('btn-release-submit').disabled = true;
       document.getElementById('file-apk-input').value = '';
+      switchPackageMode('upload');
       openModal('modal-release-version');
     }
 
@@ -1800,8 +1887,8 @@ val downloadReq = Request.Builder()
         }
 
         if (statusTextId) document.getElementById(statusTextId).innerText = '✅ 上传成功并已就绪';
-        if (submitBtn) submitBtn.disabled = false;
         showToast('文件已上传至 R2');
+        checkReleaseSubmitReady();
       } catch (err) {
         if (statusTextId) document.getElementById(statusTextId).innerText = '❌ 上传失败: ' + err.message;
         showToast('上传失败: ' + err.message, 'error');
@@ -1810,9 +1897,22 @@ val downloadReq = Request.Builder()
 
     async function handleReleaseVersion(e) {
       e.preventDefault();
-      if (!pendingUploadResult) {
-        showToast('请先选择并上传 APK 文件', 'error');
-        return;
+      const isExternalMode = currentPkgMode === 'external';
+      const extUrl = document.getElementById('ver-form-exturl')?.value.trim();
+      const useProxy = document.getElementById('ver-form-useproxy')?.checked ? 1 : 0;
+      const extFileName = document.getElementById('ver-form-extfilename')?.value.trim();
+      const extSize = parseInt(document.getElementById('ver-form-extsize')?.value, 10) || 0;
+
+      if (isExternalMode) {
+        if (!extUrl) {
+          showToast('请填写第三方下载直链', 'error');
+          return;
+        }
+      } else {
+        if (!pendingUploadResult) {
+          showToast('请先选择并上传 APK 文件', 'error');
+          return;
+        }
       }
 
       const appId = document.getElementById('ver-form-appid').value;
@@ -1823,23 +1923,27 @@ val downloadReq = Request.Builder()
       const changelog = document.getElementById('ver-form-log').value.trim();
       const isForce = document.getElementById('ver-form-force').checked ? 1 : 0;
 
+      const payload = {
+        version_name: versionName,
+        version_code: versionCode,
+        min_version_code: minVersionCode,
+        channel,
+        changelog,
+        is_force_update: isForce,
+        is_published: 1,
+        external_url: isExternalMode ? extUrl : undefined,
+        use_proxy: isExternalMode ? useProxy : 0,
+        file_key: isExternalMode ? '' : pendingUploadResult.file_key,
+        file_name: isExternalMode ? (extFileName || ('app-v' + versionName + '.apk')) : pendingUploadResult.file_name,
+        file_size: isExternalMode ? extSize : pendingUploadResult.file_size,
+        file_md5: isExternalMode ? null : pendingUploadResult.file_md5
+      };
+
       try {
         const res = await apiRequest('/api/admin/apps/' + encodeURIComponent(appId) + '/versions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            version_name: versionName,
-            version_code: versionCode,
-            min_version_code: minVersionCode,
-            channel,
-            changelog,
-            is_force_update: isForce,
-            is_published: 1,
-            file_key: pendingUploadResult.file_key,
-            file_name: pendingUploadResult.file_name,
-            file_size: pendingUploadResult.file_size,
-            file_md5: pendingUploadResult.file_md5
-          })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (data.code === 0) {

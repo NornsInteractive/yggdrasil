@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS app_versions (
     min_version_code INTEGER DEFAULT 0,    -- 触发强制更新的最低支持版本号 (低于此版本必须强更)
     channel TEXT DEFAULT 'default',        -- 渠道标识 (default / beta / googleplay / official)
     changelog TEXT,                        -- 更新日志内容 (支持 Markdown / 纯文本换行)
-    file_key TEXT NOT NULL,                -- R2 存储桶中的对象 Key
+    file_key TEXT,                         -- R2 存储桶中的对象 Key (第三方直链时可为空)
     file_name TEXT NOT NULL,               -- 原始文件名 (如 app-release-v1.2.0.apk)
     file_size INTEGER NOT NULL,            -- 文件字节大小
     file_md5 TEXT,                         -- 文件 MD5 (用于客户端校验完整性)
@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS app_versions (
     is_force_update INTEGER DEFAULT 0,     -- 是否强制更新 (0: 否, 1: 是)
     is_published INTEGER DEFAULT 1,        -- 发布状态 (0: 禁用/草稿, 1: 已发布)
     download_count INTEGER DEFAULT 0,      -- 下载计数
+    external_url TEXT,                     -- 第三方下载直链 (填入后免上传 R2)
+    use_proxy INTEGER DEFAULT 0,           -- 是否反向代理第三方下载 (0: 302跳转, 1: Worker反向代理)
+    is_cleaned INTEGER DEFAULT 0,          -- 安装包是否已被自动清理策略清理 (0: 否, 1: 是)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(app_id) REFERENCES apps(app_id) ON DELETE CASCADE
 );

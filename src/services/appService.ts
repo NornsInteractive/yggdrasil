@@ -118,7 +118,30 @@ export class AppService {
   /**
    * 获取指定 App 的版本列表
    */
+  private static schemaEnsured = false;
+
+  /**
+   * 自动平滑迁移数据库表结构 (自动增加外部下载链接、反代和清理状态字段)
+   */
+  static async ensureSchema(db: D1Database): Promise<void> {
+    if (this.schemaEnsured) return;
+    try {
+      await db.prepare('ALTER TABLE app_versions ADD COLUMN external_url TEXT').run();
+    } catch (e) {}
+    try {
+      await db.prepare('ALTER TABLE app_versions ADD COLUMN use_proxy INTEGER DEFAULT 0').run();
+    } catch (e) {}
+    try {
+      await db.prepare('ALTER TABLE app_versions ADD COLUMN is_cleaned INTEGER DEFAULT 0').run();
+    } catch (e) {}
+    this.schemaEnsured = true;
+  }
+
+  /**
+   * 获取某应用的所有版本列表 (按版本号降序)
+   */
   static async listVersions(db: D1Database, appId: string): Promise<AppVersionEntity[]> {
+    await this.ensureSchema(db);
     const { results } = await db.prepare(`
       SELECT * FROM app_versions 
       WHERE app_id = ? 
@@ -129,7 +152,7 @@ export class AppService {
   }
 
   /**
-   * 发布新版本
+   * 发布新版本 (支持直接上传至 R2 或填写第三方下载外链)
    */
   static async createVersion(
     db: D1Database,
@@ -140,28 +163,37 @@ export class AppService {
       min_version_code?: number;
       channel?: string;
       changelog?: string;
-      file_key: string;
-      file_name: string;
-      file_size: number;
+      file_key?: string;
+      file_name?: string;
+      file_size?: number;
       file_md5?: string;
       file_sha256?: string;
       is_force_update?: number;
       is_published?: number;
+      external_url?: string;
+      use_proxy?: number;
     }
   ): Promise<AppVersionEntity> {
+    await this.ensureSchema(db);
+
     const id = 'ver_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
     const now = new Date().toISOString();
     const channel = data.channel?.trim() || 'default';
     const minVersionCode = data.min_version_code !== undefined ? data.min_version_code : 0;
     const isForce = data.is_force_update ? 1 : 0;
     const isPublished = data.is_published !== undefined ? data.is_published : 1;
+    const externalUrl = data.external_url?.trim() || null;
+    const useProxy = data.use_proxy ? 1 : 0;
+    const fileKey = data.file_key?.trim() || '';
+    const fileName = data.file_name?.trim() || (externalUrl ? `app-v${data.version_name}.apk` : 'app.apk');
+    const fileSize = data.file_size || 0;
 
     await db.prepare(`
       INSERT INTO app_versions (
         id, app_id, version_code, version_name, min_version_code, channel, 
         changelog, file_key, file_name, file_size, file_md5, file_sha256, 
-        is_force_update, is_published, download_count, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+        is_force_update, is_published, download_count, external_url, use_proxy, is_cleaned, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, 0, ?)
     `).bind(
       id,
       data.app_id,
@@ -170,13 +202,15 @@ export class AppService {
       minVersionCode,
       channel,
       data.changelog?.trim() || '',
-      data.file_key,
-      data.file_name,
-      data.file_size,
+      fileKey,
+      fileName,
+      fileSize,
       data.file_md5 || null,
       data.file_sha256 || null,
       isForce,
       isPublished,
+      externalUrl,
+      useProxy,
       now
     ).run();
 
@@ -188,20 +222,23 @@ export class AppService {
       min_version_code: minVersionCode,
       channel,
       changelog: data.changelog || '',
-      file_key: data.file_key,
-      file_name: data.file_name,
-      file_size: data.file_size,
+      file_key: fileKey,
+      file_name: fileName,
+      file_size: fileSize,
       file_md5: data.file_md5 || null,
       file_sha256: data.file_sha256 || null,
       is_force_update: isForce,
       is_published: isPublished,
       download_count: 0,
+      external_url: externalUrl,
+      use_proxy: useProxy,
+      is_cleaned: 0,
       created_at: now,
     };
   }
 
   /**
-   * 更新版本属性 (修改更新日志、是否强更、发布状态等)
+   * 更新版本属性 (修改更新日志、是否强更、发布状态、外链与反代设置等)
    */
   static async updateVersion(
     db: D1Database,
@@ -213,8 +250,11 @@ export class AppService {
       changelog?: string;
       is_force_update?: number;
       is_published?: number;
+      external_url?: string;
+      use_proxy?: number;
     }
   ): Promise<void> {
+    await this.ensureSchema(db);
     await db.prepare(`
       UPDATE app_versions 
       SET version_name = COALESCE(?, version_name),
@@ -222,7 +262,9 @@ export class AppService {
           channel = COALESCE(?, channel),
           changelog = COALESCE(?, changelog),
           is_force_update = COALESCE(?, is_force_update),
-          is_published = COALESCE(?, is_published)
+          is_published = COALESCE(?, is_published),
+          external_url = COALESCE(?, external_url),
+          use_proxy = COALESCE(?, use_proxy)
       WHERE id = ?
     `).bind(
       data.version_name?.trim() || null,
@@ -231,6 +273,8 @@ export class AppService {
       data.changelog !== undefined ? data.changelog : null,
       data.is_force_update !== undefined ? data.is_force_update : null,
       data.is_published !== undefined ? data.is_published : null,
+      data.external_url !== undefined ? data.external_url.trim() : null,
+      data.use_proxy !== undefined ? data.use_proxy : null,
       versionId
     ).run();
   }

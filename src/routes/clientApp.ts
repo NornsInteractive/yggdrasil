@@ -68,9 +68,60 @@ clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c
   }
 
   // 异步增加下载次数 (不阻塞下载响应)
-  c.executionCtx.waitUntil(AppService.incrementDownloadCount(c.env.DB, version.id));
+  try {
+    c.executionCtx.waitUntil(AppService.incrementDownloadCount(c.env.DB, version.id));
+  } catch (e) {
+    AppService.incrementDownloadCount(c.env.DB, version.id).catch(() => {});
+  }
 
-  // 流式提供下载，并处理 Range 头部以实现断点续传
+  // 1. 如果该版本的安装包已被历史策略清理
+  if (version.is_cleaned === 1 && !version.external_url) {
+    return c.json({
+      code: 410,
+      message: `版本 ${version.version_name} (Code: ${version.version_code}) 的历史安装包已被存储自动清理策略归档清理。请下载最新版本。`,
+    }, 410);
+  }
+
+  // 2. 如果配置了第三方外链
+  if (version.external_url && version.external_url.trim()) {
+    const extUrl = version.external_url.trim();
+
+    // 2.1 开启反向代理：由 Edge 节点反向代理流式传输，隐藏源站并支持断点续传
+    if (version.use_proxy === 1) {
+      const forwardHeaders = new Headers();
+      const rangeHeader = c.req.header('range');
+      if (rangeHeader) forwardHeaders.set('Range', rangeHeader);
+      forwardHeaders.set('User-Agent', c.req.header('user-agent') || 'Yggdrasil-Edge-Proxy/1.0');
+
+      try {
+        const proxyRes = await fetch(extUrl, {
+          method: 'GET',
+          headers: forwardHeaders,
+        });
+
+        const resHeaders = new Headers(proxyRes.headers);
+        const fileName = version.file_name || `app-v${version.version_name}.apk`;
+        resHeaders.set('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+        resHeaders.set('Accept-Ranges', 'bytes');
+        if (!resHeaders.has('Content-Type')) {
+          resHeaders.set('Content-Type', 'application/vnd.android.package-archive');
+        }
+
+        return new Response(proxyRes.body, {
+          status: proxyRes.status,
+          statusText: proxyRes.statusText,
+          headers: resHeaders,
+        });
+      } catch (err: any) {
+        return c.json({ code: 502, message: '反向代理下载第三方安装包失败: ' + err.message }, 502);
+      }
+    }
+
+    // 2.2 未开启反向代理：直接 302 重定向到第三方下载链接
+    return c.redirect(extUrl, 302);
+  }
+
+  // 3. 正常 R2 本地文件流式提供下载，并处理 Range 头部以实现断点续传
   const rangeHeader = c.req.header('range');
   return await StorageService.serveFileWithRange(
     c.env.BUCKET,

@@ -211,10 +211,66 @@ function testCleanupLogic() {
   console.log('  ✅ Auto-cleanup retention and cutoff logic verified successfully.');
 }
 
+console.log('▶ Test 9: Verifying Third-Party External URL Redirection, Reverse Proxy, and Cleaned Package Response');
+async function testExternalUrlAndCleanedFlow() {
+  const { default: app } = await import('../dist/worker.js');
+
+  const createMockDb = (versionData) => ({
+    prepare: (sql) => ({
+      bind: (...args) => ({
+        first: async () => versionData,
+        all: async () => ({ results: [] }),
+        run: async () => ({}),
+      }),
+      all: async () => ({ results: [] }),
+      first: async () => versionData,
+      run: async () => ({}),
+    }),
+  });
+
+  const mockDbRedirect = createMockDb({
+    id: 'v_ext_redirect',
+    app_id: 'test.app',
+    version_code: 200,
+    version_name: '2.0.0',
+    external_url: 'https://download.example.com/test-app.apk',
+    use_proxy: 0,
+    is_cleaned: 0,
+    is_published: 1,
+    file_name: 'test-app.apk',
+  });
+
+  const reqRedirect = new Request('http://localhost/api/v1/app/download?app_id=test.app&version_code=200');
+  const resRedirect = await app.fetch(reqRedirect, { DB: mockDbRedirect });
+  assert.strictEqual(resRedirect.status, 302, 'External URL with use_proxy=0 should return HTTP 302 redirect');
+  assert.strictEqual(resRedirect.headers.get('Location'), 'https://download.example.com/test-app.apk', 'Should redirect to external URL');
+
+  // 2. Mock DB that returns a cleaned version (is_cleaned = 1)
+  const mockDbCleaned = createMockDb({
+    id: 'v_cleaned',
+    app_id: 'test.app',
+    version_code: 100,
+    version_name: '1.0.0',
+    external_url: null,
+    is_cleaned: 1,
+    is_published: 1,
+    file_name: 'test-app-v1.0.0.apk',
+  });
+
+  const reqCleaned = new Request('http://localhost/api/v1/app/download?app_id=test.app&version_code=100');
+  const resCleaned = await app.fetch(reqCleaned, { DB: mockDbCleaned });
+  assert.strictEqual(resCleaned.status, 410, 'Cleaned version should return HTTP 410 Gone');
+  const cleanedBody = await resCleaned.json();
+  assert(cleanedBody.message.includes('已被存储自动清理策略归档清理'), 'Should inform user package is cleaned');
+
+  console.log('  ✅ External URL 302 redirect and Cleaned package 410 response verified successfully.');
+}
+
 async function main() {
   await testJwt();
   await testAppRouting();
   testCleanupLogic();
+  await testExternalUrlAndCleanedFlow();
   console.log('\n🎉 ALL SYSTEM TESTS PASSED SUCCESSFULLY! 🚀\n');
 }
 

@@ -82,11 +82,11 @@ export class CleanupService {
 
         const keepSet = new Set((keepIds || []).map(r => r.id));
 
-        // 3. 查找该组合下所有早于截止日期的版本
+        // 3. 查找该组合下早于截止日期且尚未清理的本地包版本 (第三方外链不占用 R2，无需清理)
         const { results: candidates } = await db.prepare(
           `SELECT id, app_id, version_name, version_code, channel, file_key, file_size, created_at 
            FROM app_versions 
-           WHERE app_id = ? AND channel = ? AND created_at < ?
+           WHERE app_id = ? AND channel = ? AND created_at < ? AND (is_cleaned = 0 OR is_cleaned IS NULL) AND (file_key IS NOT NULL AND file_key != '')
            ORDER BY version_code ASC`
         ).bind(group.app_id, group.channel, cutoffDate)
           .all<{
@@ -98,10 +98,10 @@ export class CleanupService {
         if (!candidates || candidates.length === 0) continue;
 
         for (const ver of candidates) {
-          // 跳过需要保留的版本
+          // 跳过需要保留的最新版本
           if (keepSet.has(ver.id)) continue;
 
-          // 4. 删除 R2 对象
+          // 4. 从 R2 存储桶彻底删除 APK 文件
           if (ver.file_key) {
             try {
               await StorageService.deleteObject(bucket, ver.file_key);
@@ -110,8 +110,10 @@ export class CleanupService {
             }
           }
 
-          // 5. 删除 D1 记录
-          await db.prepare('DELETE FROM app_versions WHERE id = ?').bind(ver.id).run();
+          // 5. 更新 D1 数据库记录：标记安装包已被清理，清空 file_key，但完整保留版本信息、发布日志与下载统计
+          await db.prepare(
+            'UPDATE app_versions SET is_cleaned = 1, file_key = "" WHERE id = ?'
+          ).bind(ver.id).run();
 
           result.deleted++;
           result.freedBytes += ver.file_size || 0;

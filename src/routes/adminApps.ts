@@ -120,17 +120,19 @@ adminAppsRoutes.post('/api/admin/apps/:appId/versions', async (c) => {
       min_version_code?: number;
       channel?: string;
       changelog?: string;
-      file_key: string;
-      file_name: string;
-      file_size: number;
+      file_key?: string;
+      file_name?: string;
+      file_size?: number;
       file_md5?: string;
       file_sha256?: string;
       is_force_update?: number;
       is_published?: number;
+      external_url?: string;
+      use_proxy?: number;
     }>();
 
-    if (!body.version_code || !body.version_name || !body.file_key || !body.file_name || !body.file_size) {
-      return c.json({ code: 400, message: 'Missing required version fields (version_code, version_name, file_key, file_name, file_size)' }, 400);
+    if (!body.version_code || !body.version_name || (!body.file_key && !body.external_url)) {
+      return c.json({ code: 400, message: '必须填写版本号、版本名称，并选择上传 APK 文件或填写第三方下载直链' }, 400);
     }
 
     const version = await AppService.createVersion(c.env.DB, {
@@ -145,7 +147,7 @@ adminAppsRoutes.post('/api/admin/apps/:appId/versions', async (c) => {
 });
 
 /**
- * 修改版本信息 (更新日志、是否强更、发布状态)
+ * 修改版本信息 (更新日志、是否强更、发布状态、外链与反代设置)
  * PUT /api/admin/versions/:id
  */
 adminAppsRoutes.put('/api/admin/versions/:id', async (c) => {
@@ -158,6 +160,8 @@ adminAppsRoutes.put('/api/admin/versions/:id', async (c) => {
       changelog?: string;
       is_force_update?: number;
       is_published?: number;
+      external_url?: string;
+      use_proxy?: number;
     }>();
 
     await AppService.updateVersion(c.env.DB, id, body);

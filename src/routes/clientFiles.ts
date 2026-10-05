@@ -98,7 +98,11 @@ clientFilesRoutes.get('/api/v1/files/:id/download', tokenGuard('file_download'),
     return c.json({ code: 404, message: 'File not found' }, 404);
   }
 
-  c.executionCtx.waitUntil(FileService.incrementDownloadCount(c.env.DB, file.id));
+  try {
+    c.executionCtx.waitUntil(FileService.incrementDownloadCount(c.env.DB, file.id));
+  } catch (e) {
+    FileService.incrementDownloadCount(c.env.DB, file.id).catch(() => {});
+  }
 
   const rangeHeader = c.req.header('range');
   return await StorageService.serveFileWithRange(
@@ -121,7 +125,11 @@ clientFilesRoutes.get('/f/:alias', tokenGuard('file_download'), async (c) => {
     return c.json({ code: 404, message: 'File not found by alias' }, 404);
   }
 
-  c.executionCtx.waitUntil(FileService.incrementDownloadCount(c.env.DB, file.id));
+  try {
+    c.executionCtx.waitUntil(FileService.incrementDownloadCount(c.env.DB, file.id));
+  } catch (e) {
+    FileService.incrementDownloadCount(c.env.DB, file.id).catch(() => {});
+  }
 
   const rangeHeader = c.req.header('range');
   return await StorageService.serveFileWithRange(

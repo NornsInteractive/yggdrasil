@@ -243,9 +243,9 @@
 
 ### 3.3 版本发布管理 (Versions CRUD)
 
-#### 1. 发布新版本
+#### 1. 发布新版本 (支持 R2 直接上传 或 第三方外链免上传)
 - `POST /api/admin/apps/:appId/versions`
-- Body:
+- **方式 A：上传至 Cloudflare R2**
   ```json
   {
     "version_code": 10200,
@@ -261,16 +261,30 @@
     "file_md5": "e10adc3949ba59abbe56e057f20f883e"
   }
   ```
+- **方式 B：配置第三方直链下载 (免上传 R2，可选是否反向代理)**
+  ```json
+  {
+    "version_code": 10300,
+    "version_name": "1.3.0",
+    "channel": "default",
+    "changelog": "- 新增外链直链下载支持",
+    "external_url": "https://cdn.example.com/downloads/app-v1.3.0.apk",
+    "use_proxy": 1, // 0: 302重定向跳转, 1: 由边缘Worker节点流式反向代理 (隐藏源站IP并支持断点续传)
+    "file_name": "app-v1.3.0.apk",
+    "file_size": 48123456
+  }
+  ```
 
 #### 2. 获取某应用的历史版本列表
 - `GET /api/admin/apps/:appId/versions`
+- 返回该 App 的完整历史发布记录。已超期被自动策略清理的旧版本会带有 `is_cleaned: 1` 标识，其发布日志、版本号、创建时间均被完整保留展示。
 
 #### 3. 编辑版本属性
 - `PUT /api/admin/versions/:id`
-- Body: 支持修改 `version_name`, `min_version_code`, `channel`, `changelog`, `is_force_update`, `is_published`。
+- Body: 支持修改 `version_name`, `min_version_code`, `channel`, `changelog`, `is_force_update`, `is_published`, `external_url`, `use_proxy`。
 
-#### 4. 删除版本
-- `DELETE /api/admin/versions/:id`（同步从 R2 彻底删除该文件）
+#### 4. 删除版本记录
+- `DELETE /api/admin/versions/:id`（彻底删除该版本数据库记录并同步从 R2 删除对应文件）
 
 ---
 

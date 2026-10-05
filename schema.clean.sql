@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS app_versions (
     min_version_code INTEGER DEFAULT 0,
     channel TEXT DEFAULT 'default',
     changelog TEXT,
-    file_key TEXT NOT NULL,
+    file_key TEXT,
     file_name TEXT NOT NULL,
     file_size INTEGER NOT NULL,
     file_md5 TEXT,
@@ -24,6 +24,9 @@ CREATE TABLE IF NOT EXISTS app_versions (
     is_force_update INTEGER DEFAULT 0,
     is_published INTEGER DEFAULT 1,
     download_count INTEGER DEFAULT 0,
+    external_url TEXT,
+    use_proxy INTEGER DEFAULT 0,
+    is_cleaned INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(app_id) REFERENCES apps(app_id) ON DELETE CASCADE
 );
