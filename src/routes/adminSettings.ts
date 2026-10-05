@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import { Env } from '../types';
 import { SettingService } from '../services/settingService';
 import { adminAuthMiddleware } from '../middleware/auth';
+import { CleanupService } from '../services/cleanupService';
 
 export const adminSettingsRoutes = new Hono<{ Bindings: Env }>();
 
@@ -48,4 +49,33 @@ adminSettingsRoutes.post('/api/admin/settings/generate-token', async (c) => {
   crypto.getRandomValues(array);
   const token = 'ygg_' + Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
   return c.json({ code: 0, message: 'Token generated', data: { token } });
+});
+
+/**
+ * 手动触发旧版本清理
+ * POST /api/admin/cleanup
+ */
+adminSettingsRoutes.post('/api/admin/cleanup', async (c) => {
+  try {
+    const result = await CleanupService.runCleanup(c.env.DB, c.env.BUCKET);
+    return c.json({ code: 0, message: `Cleanup completed: ${result.deleted} versions removed`, data: result });
+  } catch (e: any) {
+    return c.json({ code: 500, message: 'Cleanup failed: ' + e.message }, 500);
+  }
+});
+
+/**
+ * 手动强制清理 (忽略开关，按传入参数执行)
+ * POST /api/admin/cleanup/force
+ */
+adminSettingsRoutes.post('/api/admin/cleanup/force', async (c) => {
+  try {
+    const body = await c.req.json<{ days?: number; keep_latest?: number }>();
+    const days = body.days || 90;
+    const keepLatest = body.keep_latest || 3;
+    const result = await CleanupService.forceCleanup(c.env.DB, c.env.BUCKET, days, keepLatest);
+    return c.json({ code: 0, message: `Force cleanup completed: ${result.deleted} versions removed`, data: result });
+  } catch (e: any) {
+    return c.json({ code: 500, message: 'Force cleanup failed: ' + e.message }, 500);
+  }
 });

@@ -20,4 +20,7 @@ export const SETTING_KEYS = {
   APP_DOWNLOAD_REQUIRE_TOKEN: 'app_download_require_token',
   FILE_DOWNLOAD_REQUIRE_TOKEN: 'file_download_require_token',
   SITE_TITLE: 'site_title',
+  AUTO_CLEANUP_ENABLED: 'auto_cleanup_enabled',
+  AUTO_CLEANUP_DAYS: 'auto_cleanup_days',
+  AUTO_CLEANUP_KEEP_LATEST: 'auto_cleanup_keep_latest',
 };

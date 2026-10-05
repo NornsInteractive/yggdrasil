@@ -71,5 +71,7 @@ INSERT OR IGNORE INTO system_settings (key, value, description) VALUES
 ('api_fixed_token', 'ygg_secret_token_default_2026', '客户端公共接口访问的固定 API Token'),
 ('app_check_require_token', 'false', 'App 版本检测接口是否强制校验 Token (true/false)'),
 ('app_download_require_token', 'false', 'App APK 下载接口是否强制校验 Token (true/false)'),
-('file_download_require_token', 'false', '通用文件下载是否强制校验 Token (true/false)'),
-('site_title', 'Yggdrasil - 分发管理中心', '控制台网站标题');
+('site_title', 'Yggdrasil - 分发管理中心', '控制台网站标题'),
+('auto_cleanup_enabled', 'false', '是否开启 R2 存储与旧安装包自动清理 (true/false)'),
+('auto_cleanup_days', '90', '保留天数，超过此天数的旧版本将被清理'),
+('auto_cleanup_keep_latest', '3', '每个渠道至少保留的最新版本数量');

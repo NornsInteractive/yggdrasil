@@ -12,6 +12,7 @@ import { adminAppsRoutes } from './routes/adminApps';
 import { adminFilesRoutes } from './routes/adminFiles';
 import { adminUploadRoutes } from './routes/adminUpload';
 import { adminSettingsRoutes } from './routes/adminSettings';
+import { CleanupService } from './services/cleanupService';
 import { renderDashboardHtml } from './views/dashboard';
 
 const app = new Hono<{ Bindings: Env }>();
@@ -92,4 +93,19 @@ app.onError((err, c) => {
   }, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch,
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(
+      (async () => {
+        try {
+          console.log('[Yggdrasil Cron] Starting scheduled auto-cleanup...');
+          const result = await CleanupService.runCleanup(env.DB, env.BUCKET);
+          console.log(`[Yggdrasil Cron] Cleanup complete: enabled=${result.enabled}, deleted=${result.deleted}, freedBytes=${result.freedBytes}`);
+        } catch (e) {
+          console.error('[Yggdrasil Cron] Scheduled cleanup failed:', e);
+        }
+      })()
+    );
+  },
+};

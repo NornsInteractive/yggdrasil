@@ -32,6 +32,9 @@ export class SettingService {
       [SETTING_KEYS.APP_DOWNLOAD_REQUIRE_TOKEN]: 'false',
       [SETTING_KEYS.FILE_DOWNLOAD_REQUIRE_TOKEN]: 'false',
       [SETTING_KEYS.SITE_TITLE]: 'Yggdrasil - 应用与文件分发管理中心',
+      [SETTING_KEYS.AUTO_CLEANUP_ENABLED]: 'false',
+      [SETTING_KEYS.AUTO_CLEANUP_DAYS]: '90',
+      [SETTING_KEYS.AUTO_CLEANUP_KEEP_LATEST]: '3',
     };
 
     try {

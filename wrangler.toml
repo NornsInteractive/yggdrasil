@@ -4,3 +4,7 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
 keep_vars = true
+
+# 每天凌晨 3:00 UTC 自动执行旧版本清理
+[triggers]
+crons = ["0 3 * * *"]

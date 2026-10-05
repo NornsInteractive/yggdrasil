@@ -918,6 +918,37 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
             <input type="checkbox" id="cfg-file-download-token" class="switch-checkbox" />
           </div>
         </div>
+
+        <div class="stat-card">
+          <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 1rem;">🧹 R2 存储自动清理策略</h3>
+          <p style="color: var(--text-muted); font-size: 0.825rem; margin-bottom: 1rem;">自动删除超过指定天数的旧版本安装包，始终保留每个渠道最新 N 个版本，防止 R2 存储被历史包占满。</p>
+          
+          <div class="switch-wrap">
+            <div class="switch-info">
+              <span class="switch-title">启用自动清理</span>
+              <span class="switch-desc">开启后，系统将每天凌晨自动扫描并清理超期旧版本 APK</span>
+            </div>
+            <input type="checkbox" id="cfg-auto-cleanup-enabled" class="switch-checkbox" />
+          </div>
+
+          <div class="form-row" style="margin-top: 1rem;">
+            <div class="form-col form-group">
+              <label class="form-label">保留天数 (超过此天数的旧版本将被清理)</label>
+              <input type="number" id="cfg-auto-cleanup-days" class="form-control mono" value="90" min="1" max="3650" placeholder="90" />
+              <div class="form-help">默认 90 天，建议根据发版频率调整</div>
+            </div>
+            <div class="form-col form-group">
+              <label class="form-label">每个渠道至少保留版本数</label>
+              <input type="number" id="cfg-auto-cleanup-keep" class="form-control mono" value="3" min="1" max="100" placeholder="3" />
+              <div class="form-help">即使超期，也会保留每个 App 每个渠道最新的 N 个版本</div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; margin-top: 1.25rem; align-items: center; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="runManualCleanup()">🧹 立即执行清理</button>
+            <span id="cleanup-result" style="font-size: 0.825rem; color: var(--text-muted);"></span>
+          </div>
+        </div>
       </section>
 
       <!-- TAB 4: 接口调试台 -->
@@ -1930,6 +1961,9 @@ val downloadReq = Request.Builder()
           document.getElementById('cfg-app-check-token').checked = settingsData['app_check_require_token'] === 'true';
           document.getElementById('cfg-app-download-token').checked = settingsData['app_download_require_token'] === 'true';
           document.getElementById('cfg-file-download-token').checked = settingsData['file_download_require_token'] === 'true';
+          document.getElementById('cfg-auto-cleanup-enabled').checked = settingsData['auto_cleanup_enabled'] === 'true';
+          document.getElementById('cfg-auto-cleanup-days').value = settingsData['auto_cleanup_days'] || '90';
+          document.getElementById('cfg-auto-cleanup-keep').value = settingsData['auto_cleanup_keep_latest'] || '3';
         }
       } catch (e) {}
     }
@@ -1951,7 +1985,10 @@ val downloadReq = Request.Builder()
         api_fixed_token: document.getElementById('cfg-fixed-token').value.trim(),
         app_check_require_token: document.getElementById('cfg-app-check-token').checked ? 'true' : 'false',
         app_download_require_token: document.getElementById('cfg-app-download-token').checked ? 'true' : 'false',
-        file_download_require_token: document.getElementById('cfg-file-download-token').checked ? 'true' : 'false'
+        file_download_require_token: document.getElementById('cfg-file-download-token').checked ? 'true' : 'false',
+        auto_cleanup_enabled: document.getElementById('cfg-auto-cleanup-enabled').checked ? 'true' : 'false',
+        auto_cleanup_days: document.getElementById('cfg-auto-cleanup-days').value.trim() || '90',
+        auto_cleanup_keep_latest: document.getElementById('cfg-auto-cleanup-keep').value.trim() || '3'
       };
 
       try {
@@ -1969,6 +2006,41 @@ val downloadReq = Request.Builder()
         }
       } catch (err) {
         showToast('保存失败: ' + err.message, 'error');
+      }
+    }
+
+    async function runManualCleanup() {
+      const resultEl = document.getElementById('cleanup-result');
+      resultEl.textContent = '⏳ 正在执行清理...';
+      resultEl.style.color = 'var(--text-muted)';
+      try {
+        const res = await apiRequest('/api/admin/cleanup', { method: 'POST' });
+        const data = await res.json();
+        if (data.code === 0) {
+          const r = data.data;
+          if (!r.enabled) {
+            resultEl.textContent = '⚠️ 自动清理未启用，请先开启开关并保存设置后再执行';
+            resultEl.style.color = '#fbbf24';
+          } else if (r.deleted === 0) {
+            resultEl.textContent = '✅ 扫描完成，没有发现需要清理的过期版本';
+            resultEl.style.color = '#6ee7b7';
+          } else {
+            const freedMB = (r.freedBytes / 1024 / 1024).toFixed(2);
+            resultEl.textContent = '✅ 清理完成！已删除 ' + r.deleted + ' 个旧版本，释放 ' + freedMB + ' MB 存储空间';
+            resultEl.style.color = '#6ee7b7';
+            loadApps();
+            loadStats();
+          }
+          showToast(resultEl.textContent);
+        } else {
+          resultEl.textContent = '❌ ' + data.message;
+          resultEl.style.color = '#fca5a5';
+          showToast(data.message, 'error');
+        }
+      } catch (err) {
+        resultEl.textContent = '❌ 清理失败: ' + err.message;
+        resultEl.style.color = '#fca5a5';
+        showToast('清理失败', 'error');
       }
     }
 

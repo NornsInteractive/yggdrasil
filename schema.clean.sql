@@ -62,4 +62,7 @@ INSERT OR IGNORE INTO system_settings (key, value, description) VALUES
 ('app_check_require_token', 'false', 'Require token for app check API'),
 ('app_download_require_token', 'false', 'Require token for app download API'),
 ('file_download_require_token', 'false', 'Require token for file download API'),
-('site_title', 'Yggdrasil - 分发管理中心', 'Site title');
+('site_title', 'Yggdrasil - 分发管理中心', 'Site title'),
+('auto_cleanup_enabled', 'false', 'Enable auto cleanup old packages'),
+('auto_cleanup_days', '90', 'Days to retain before cleanup'),
+('auto_cleanup_keep_latest', '3', 'Minimum versions to keep per channel');

@@ -312,9 +312,22 @@
 
 | 接口 | 方法 | 路径 | 说明 |
 | :--- | :--- | :--- | :--- |
-| **获取配置** | `GET` | `/api/admin/settings` | 获取所有动态 Token 开关与固定 Token 值 |
-| **保存配置** | `PUT` | `/api/admin/settings` | 动态热更新 Token 与鉴权开关 |
+| **获取配置** | `GET` | `/api/admin/settings` | 获取所有动态 Token 开关、自动清理策略与固定 Token 值 |
+| **保存配置** | `PUT` | `/api/admin/settings` | 动态热更新 Token、鉴权开关与自动清理策略 |
 | **生成随机 Token** | `POST` | `/api/admin/settings/generate-token` | 生成 24 字节高强度随机 Token |
+
+---
+
+### 3.7 R2 存储与旧安装包自动清理 (Auto Cleanup)
+
+| 接口 | 方法 | 路径 | 说明 |
+| :--- | :--- | :--- | :--- |
+| **手动触发清理** | `POST` | `/api/admin/cleanup` | 根据当前配置的清理规则（过期天数与保留数）扫描并清理旧安装包 |
+| **强制清理** | `POST` | `/api/admin/cleanup/force` | 忽略开关，按传入的 `{ days: 90, keep_latest: 3 }` 参数立即执行清理 |
+
+- **定时任务触发机制 (Cloudflare Cron Trigger)**：
+  - 系统内置 Cloudflare Scheduled 任务，在每日 `03:00 UTC` 自动触发 `CleanupService.runCleanup`。
+  - 自动保留每个 App 每个渠道最新 N 个版本（默认 3 个），超出保留天数（默认 90 天）的历史旧安装包将自动从 R2 存储桶和 D1 数据库中安全删除。
 
 ---
 
