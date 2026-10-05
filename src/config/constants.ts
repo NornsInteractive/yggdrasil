@@ -23,4 +23,5 @@ export const SETTING_KEYS = {
   AUTO_CLEANUP_ENABLED: 'auto_cleanup_enabled',
   AUTO_CLEANUP_DAYS: 'auto_cleanup_days',
   AUTO_CLEANUP_KEEP_LATEST: 'auto_cleanup_keep_latest',
+  GITHUB_TOKEN: 'github_token',
 };

@@ -929,6 +929,17 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
         </div>
 
         <div class="stat-card">
+          <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 1rem;">🐙 GitHub 私有仓库 Release 代理鉴权 (可选)</h3>
+          <p style="color: var(--text-muted); font-size: 0.825rem; margin-bottom: 1rem;">若您的项目代码为 <strong>Private（私有）</strong>，又希望将 Release 文件对外公开下载，可在此填入 GitHub Personal Access Token (PAT)。反向代理时，系统会自动携带该凭证通过 GitHub API 安全拉取对应私有资产并提供下载，而代码仓库保持 100% 闭源保密。</p>
+          
+          <div class="form-group">
+            <label class="form-label">GitHub Personal Access Token (PAT)</label>
+            <input type="password" id="cfg-github-token" class="form-control mono" placeholder="ghp_xxxxxxxxxxxx 或 github_pat_xxxxxxxxxxxx" />
+            <div class="form-help">Token 仅保存在您的 Cloudflare D1 数据库中。建议在 GitHub 中生成 Fine-grained Token，权限仅需赋予对应私有仓库的「Contents: Read-only」。留空则代表仅代理公开链接。</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
           <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 1rem;">🧹 R2 存储自动清理策略</h3>
           <p style="color: var(--text-muted); font-size: 0.825rem; margin-bottom: 1rem;">自动删除超过指定天数的旧版本安装包，始终保留每个渠道最新 N 个版本，防止 R2 存储被历史包占满。</p>
           
@@ -2258,6 +2269,7 @@ val downloadReq = Request.Builder()
           document.getElementById('cfg-auto-cleanup-enabled').checked = settingsData['auto_cleanup_enabled'] === 'true';
           document.getElementById('cfg-auto-cleanup-days').value = settingsData['auto_cleanup_days'] || '90';
           document.getElementById('cfg-auto-cleanup-keep').value = settingsData['auto_cleanup_keep_latest'] || '3';
+          document.getElementById('cfg-github-token').value = settingsData['github_token'] || '';
         }
       } catch (e) {}
     }
@@ -2282,7 +2294,8 @@ val downloadReq = Request.Builder()
         file_download_require_token: document.getElementById('cfg-file-download-token').checked ? 'true' : 'false',
         auto_cleanup_enabled: document.getElementById('cfg-auto-cleanup-enabled').checked ? 'true' : 'false',
         auto_cleanup_days: document.getElementById('cfg-auto-cleanup-days').value.trim() || '90',
-        auto_cleanup_keep_latest: document.getElementById('cfg-auto-cleanup-keep').value.trim() || '3'
+        auto_cleanup_keep_latest: document.getElementById('cfg-auto-cleanup-keep').value.trim() || '3',
+        github_token: document.getElementById('cfg-github-token').value.trim()
       };
 
       try {

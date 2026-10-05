@@ -35,6 +35,7 @@ export class SettingService {
       [SETTING_KEYS.AUTO_CLEANUP_ENABLED]: 'false',
       [SETTING_KEYS.AUTO_CLEANUP_DAYS]: '90',
       [SETTING_KEYS.AUTO_CLEANUP_KEEP_LATEST]: '3',
+      [SETTING_KEYS.GITHUB_TOKEN]: '',
     };
 
     try {

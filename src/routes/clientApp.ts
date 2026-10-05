@@ -6,6 +6,8 @@ import { Hono } from 'hono';
 import { Env } from '../types';
 import { AppService } from '../services/appService';
 import { StorageService } from '../services/storageService';
+import { SettingService } from '../services/settingService';
+import { SETTING_KEYS } from '../config/constants';
 import { tokenGuard } from '../middleware/tokenGuard';
 
 export const clientAppRoutes = new Hono<{ Bindings: Env }>();
@@ -103,7 +105,43 @@ clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c
       forwardHeaders.set('User-Agent', c.req.header('user-agent') || 'Yggdrasil-Edge-Proxy/1.0');
 
       try {
-        const proxyRes = await fetch(extUrl, {
+        let downloadTargetUrl = extUrl;
+        const githubMatch = extUrl.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/releases\/download\/([^/]+)\/(.+)$/);
+
+        // 如果是 GitHub Release 链接，尝试读取 GitHub Token 以支持私有仓库的 Release 下载
+        if (githubMatch) {
+          const githubToken = await SettingService.getSetting(c.env.DB, SETTING_KEYS.GITHUB_TOKEN, '');
+          if (githubToken && githubToken.trim()) {
+            const [, owner, repo, tag, rawFilename] = githubMatch;
+            const filename = decodeURIComponent(rawFilename);
+
+            try {
+              // 1. 通过 GitHub API 获取 Release 的 Asset 列表
+              const releaseRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/tags/${encodeURIComponent(tag)}`, {
+                headers: {
+                  'Authorization': `Bearer ${githubToken.trim()}`,
+                  'User-Agent': 'Yggdrasil-Edge-Proxy/1.0',
+                  'Accept': 'application/vnd.github+json'
+                }
+              });
+
+              if (releaseRes.ok) {
+                const releaseData = await releaseRes.json<{ assets?: Array<{ id: number; name: string }> }>();
+                const targetAsset = releaseData.assets?.find(a => a.name === filename);
+                if (targetAsset) {
+                  // 2. 将目标地址指向 GitHub API 资产二进制下载接口
+                  downloadTargetUrl = `https://api.github.com/repos/${owner}/${repo}/releases/assets/${targetAsset.id}`;
+                  forwardHeaders.set('Authorization', `Bearer ${githubToken.trim()}`);
+                  forwardHeaders.set('Accept', 'application/octet-stream');
+                }
+              }
+            } catch (e) {
+              console.warn('[Proxy] Failed to query GitHub Release Asset API:', e);
+            }
+          }
+        }
+
+        const proxyRes = await fetch(downloadTargetUrl, {
           method: 'GET',
           headers: forwardHeaders,
           redirect: 'follow',
@@ -115,7 +153,7 @@ clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c
           const isGithub = extUrl.includes('github.com');
           let extraHint = '';
           if (proxyRes.status === 404 && isGithub) {
-            extraHint = '（提示：GitHub 私有仓库未授权访问会返回 404，请确保 Release 或仓库为 Public 公开状态，或直接在控制台上传文件到 R2 存储）';
+            extraHint = '（提示：GitHub 私有仓库未配置有效 Token 会返回 404。请在「系统设置」中配置 GitHub Access Token，或将仓库设为 Public，或直接在控制台上传文件到 R2 存储）';
           }
 
           if (isHtmlClient) {
@@ -146,9 +184,10 @@ clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c
     <div class="hint">
       <strong>💡 排查原因：GitHub 私有仓库限制</strong><br>
       检测到目标为 GitHub Release 链接。若仓库为 <strong>Private（私有）</strong>，GitHub 严禁任何未登录的外部请求直接下载 Release 资源并固定返回 404。<br><br>
-      <strong>建议解决方案：</strong><br>
-      1. <strong>将 GitHub 仓库设为 Public 公开（推荐）：</strong>在 GitHub 仓库 Settings &rarr; Danger Zone 将可见性改为 Public，公开后直链及反代均可秒级生效下载；<br>
-      2. <strong>直接在后台上传 APK 至 R2：</strong>在 Yggdrasil 控制台选择「上传 APK 到 R2 存储」（支持大文件分片直传），无需依赖 GitHub 且国内外下载速度更快。
+      <strong>建议解决方案（三选一）：</strong><br>
+      1. <strong>在 Yggdrasil 配置 GitHub Token（强烈推荐）：</strong>在 Yggdrasil「系统设置」中填入 GitHub Personal Access Token (PAT)，Edge 节点即可自动解锁并代理下载私有 Release 安装包，代码依然保持 100% 闭源保密！<br>
+      2. <strong>直接在后台上传 APK 至 R2：</strong>在 Yggdrasil 控制台选择「上传 APK 到 R2 存储」（支持大文件分片直传），无需依赖 GitHub 且国内外下载速度更快；<br>
+      3. <strong>将 GitHub 仓库设为 Public 公开：</strong>在 GitHub 仓库 Settings &rarr; Danger Zone 将可见性改为 Public，公开后直链及反代均可秒级生效下载。
     </div>` : ''}
     <a href="/admin" class="btn">返回后台管理</a>
   </div>
