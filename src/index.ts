@@ -22,8 +22,13 @@ app.use('*', corsMiddleware);
 
 // 2. 检查 Cloudflare D1 与 R2 资源绑定是否已在控制台配置
 app.use('/api/*', async (c, next) => {
-  // 登录与登出不需要 D1
-  if (c.req.path === '/api/admin/login' || c.req.path === '/api/admin/logout') {
+  // 登录、登出、检查登录态均不需要 D1
+  if (
+    c.req.path === '/api/admin/login' || 
+    c.req.path === '/api/admin/logout' || 
+    c.req.path === '/api/admin/me' ||
+    c.req.path === '/health'
+  ) {
     return await next();
   }
 

@@ -788,6 +788,15 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
     </header>
 
     <main class="content">
+      <!-- 全局绑定缺失与系统错误提示横幅 -->
+      <div id="global-alert-banner" class="hidden" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: var(--radius-lg); padding: 1.25rem; margin-bottom: 1.5rem; color: #fca5a5; display: flex; align-items: flex-start; gap: 0.75rem;">
+        <span style="font-size: 1.5rem; line-height: 1;">⚠️</span>
+        <div style="flex: 1;">
+          <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 0.35rem; color: #ef4444;">系统资源配置提示</div>
+          <div id="global-alert-text" style="font-size: 0.85rem; line-height: 1.6; color: #fecaca;"></div>
+        </div>
+      </div>
+
       <!-- 统计栏 -->
       <div class="stats-grid">
         <div class="stat-card">
@@ -1447,6 +1456,15 @@ val downloadReq = Request.Builder()
       showToast('已登出');
     }
 
+    function showGlobalAlert(msg) {
+      const banner = document.getElementById('global-alert-banner');
+      const text = document.getElementById('global-alert-text');
+      if (banner && text) {
+        text.innerText = msg;
+        banner.classList.remove('hidden');
+      }
+    }
+
     // Stats
     async function loadStats() {
       try {
@@ -1457,6 +1475,8 @@ val downloadReq = Request.Builder()
           document.getElementById('stat-files').innerText = data.data.totalFiles;
           document.getElementById('stat-storage').innerText = formatBytes(data.data.totalStorageBytes);
           document.getElementById('stat-downloads').innerText = data.data.totalDownloads;
+        } else if (data.message && (data.message.includes('绑定缺失') || data.message.includes('D1'))) {
+          showGlobalAlert(data.message);
         }
       } catch (e) {}
     }
@@ -1469,6 +1489,8 @@ val downloadReq = Request.Builder()
         if (data.code === 0) {
           appsData = data.data || [];
           renderApps();
+        } else if (data.message && (data.message.includes('绑定缺失') || data.message.includes('D1'))) {
+          showGlobalAlert(data.message);
         }
       } catch (e) {}
     }
