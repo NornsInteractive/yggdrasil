@@ -86,6 +86,15 @@ clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c
   if (version.external_url && version.external_url.trim()) {
     const extUrl = version.external_url.trim();
 
+    // 2.0 防御循环重定向：如果外部直链指向当前网关自身的下载地址，直接报错阻止
+    const currentOrigin = new URL(c.req.url).origin;
+    if (extUrl.startsWith(currentOrigin) || extUrl.includes('/api/v1/app/download')) {
+      return c.json({
+        code: 400,
+        message: '配置错误：第三方外链 (external_url) 不能指向当前网关自身的下载接口 (/api/v1/app/download)，否则会造成无限重定向循环。请在后台管理界面修改此版本的外部下载直链。',
+      }, 400);
+    }
+
     // 2.1 开启反向代理：由 Edge 节点反向代理流式传输，隐藏源站并支持断点续传
     if (version.use_proxy === 1) {
       const forwardHeaders = new Headers();
@@ -97,13 +106,32 @@ clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c
         const proxyRes = await fetch(extUrl, {
           method: 'GET',
           headers: forwardHeaders,
+          redirect: 'follow',
         });
 
+        // 处理第三方源站返回的异常状态码 (如 404, 403, 500 等)
+        if (!proxyRes.ok) {
+          let extraHint = '';
+          if (proxyRes.status === 404 && extUrl.includes('github.com')) {
+            extraHint = '（提示：GitHub 私有仓库未授权访问会返回 404，请确保 Release 或仓库为 Public 公开状态，或使用公开可直接下载的 URL）';
+          }
+          return c.json({
+            code: 502,
+            message: `反向代理下载第三方安装包失败: 第三方源站返回 HTTP ${proxyRes.status} (${proxyRes.statusText})。请检查外部下载链接是否有效且支持匿名公开访问。${extraHint}`,
+          }, 502);
+        }
+
         const resHeaders = new Headers(proxyRes.headers);
+        // 重要：Cloudflare Workers 的 fetch() 会自动解压缩上游 gzip/br 响应体。
+        // 如果保留上游的 content-encoding: gzip，浏览器二次解压时会报 ERR_CONTENT_DECODING_FAILED 崩溃。
+        // 故必须删除 content-encoding 和 content-length。
+        resHeaders.delete('content-encoding');
+        resHeaders.delete('content-length');
+
         const fileName = version.file_name || `app-v${version.version_name}.apk`;
         resHeaders.set('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
         resHeaders.set('Accept-Ranges', 'bytes');
-        if (!resHeaders.has('Content-Type')) {
+        if (!resHeaders.has('Content-Type') || resHeaders.get('Content-Type')?.includes('text/')) {
           resHeaders.set('Content-Type', 'application/vnd.android.package-archive');
         }
 

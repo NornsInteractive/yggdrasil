@@ -135,6 +135,16 @@ adminAppsRoutes.post('/api/admin/apps/:appId/versions', async (c) => {
       return c.json({ code: 400, message: '必须填写版本号、版本名称，并选择上传 APK 文件或填写第三方下载直链' }, 400);
     }
 
+    if (body.external_url && body.external_url.trim()) {
+      const ext = body.external_url.trim();
+      if (!ext.startsWith('http://') && !ext.startsWith('https://')) {
+        return c.json({ code: 400, message: '第三方下载直链必须以 http:// 或 https:// 开头' }, 400);
+      }
+      if (ext.includes('/api/v1/app/download')) {
+        return c.json({ code: 400, message: '第三方直链不能填写当前网关自身的 /api/v1/app/download 地址，必须为外部源站真实下载链接！' }, 400);
+      }
+    }
+
     const version = await AppService.createVersion(c.env.DB, {
       ...body,
       app_id: appId,
@@ -162,7 +172,18 @@ adminAppsRoutes.put('/api/admin/versions/:id', async (c) => {
       is_published?: number;
       external_url?: string;
       use_proxy?: number;
+      file_name?: string;
     }>();
+
+    if (body.external_url && body.external_url.trim()) {
+      const ext = body.external_url.trim();
+      if (!ext.startsWith('http://') && !ext.startsWith('https://')) {
+        return c.json({ code: 400, message: '第三方下载直链必须以 http:// 或 https:// 开头' }, 400);
+      }
+      if (ext.includes('/api/v1/app/download')) {
+        return c.json({ code: 400, message: '第三方直链不能填写当前网关自身的 /api/v1/app/download 地址，必须为外部源站真实下载链接！' }, 400);
+      }
+    }
 
     await AppService.updateVersion(c.env.DB, id, body);
     return c.json({ code: 0, message: 'Version updated successfully' });

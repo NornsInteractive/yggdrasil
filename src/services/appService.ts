@@ -252,31 +252,55 @@ export class AppService {
       is_published?: number;
       external_url?: string;
       use_proxy?: number;
+      file_name?: string;
     }
   ): Promise<void> {
     await this.ensureSchema(db);
-    await db.prepare(`
-      UPDATE app_versions 
-      SET version_name = COALESCE(?, version_name),
-          min_version_code = COALESCE(?, min_version_code),
-          channel = COALESCE(?, channel),
-          changelog = COALESCE(?, changelog),
-          is_force_update = COALESCE(?, is_force_update),
-          is_published = COALESCE(?, is_published),
-          external_url = COALESCE(?, external_url),
-          use_proxy = COALESCE(?, use_proxy)
-      WHERE id = ?
-    `).bind(
-      data.version_name?.trim() || null,
-      data.min_version_code !== undefined ? data.min_version_code : null,
-      data.channel?.trim() || null,
-      data.changelog !== undefined ? data.changelog : null,
-      data.is_force_update !== undefined ? data.is_force_update : null,
-      data.is_published !== undefined ? data.is_published : null,
-      data.external_url !== undefined ? data.external_url.trim() : null,
-      data.use_proxy !== undefined ? data.use_proxy : null,
-      versionId
-    ).run();
+
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (data.version_name !== undefined) {
+      updates.push('version_name = ?');
+      values.push(data.version_name.trim());
+    }
+    if (data.min_version_code !== undefined) {
+      updates.push('min_version_code = ?');
+      values.push(data.min_version_code);
+    }
+    if (data.channel !== undefined) {
+      updates.push('channel = ?');
+      values.push(data.channel.trim() || 'default');
+    }
+    if (data.changelog !== undefined) {
+      updates.push('changelog = ?');
+      values.push(data.changelog);
+    }
+    if (data.is_force_update !== undefined) {
+      updates.push('is_force_update = ?');
+      values.push(data.is_force_update);
+    }
+    if (data.is_published !== undefined) {
+      updates.push('is_published = ?');
+      values.push(data.is_published);
+    }
+    if (data.external_url !== undefined) {
+      updates.push('external_url = ?');
+      values.push(data.external_url.trim() || null);
+    }
+    if (data.use_proxy !== undefined) {
+      updates.push('use_proxy = ?');
+      values.push(data.use_proxy);
+    }
+    if (data.file_name !== undefined) {
+      updates.push('file_name = ?');
+      values.push(data.file_name.trim() || null);
+    }
+
+    if (updates.length === 0) return;
+
+    values.push(versionId);
+    await db.prepare(`UPDATE app_versions SET ${updates.join(', ')} WHERE id = ?`).bind(...values).run();
   }
 
   /**

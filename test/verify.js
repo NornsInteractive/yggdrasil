@@ -181,8 +181,10 @@ async function testAppRouting() {
   const healthRes = await app.fetch(new Request('http://localhost/health'), {});
   assert.strictEqual(healthRes.status, 200, 'GET /health should return 200 OK');
   assert(rootHtml.includes('R2 存储自动清理策略'), 'Dashboard HTML should include auto-cleanup settings card');
+  assert(rootHtml.includes('modal-edit-version'), 'Dashboard HTML should include edit version modal');
+  assert(rootHtml.includes('openEditVersionModal'), 'Dashboard HTML should include openEditVersionModal function');
   assert(typeof app.scheduled === 'function', 'Worker export must include scheduled handler for Cron triggers');
-  console.log('  ✅ GET /, /admin, /health routing & scheduled cron handler verified.');
+  console.log('  ✅ GET /, /admin, /health routing, Edit Version UI & scheduled cron handler verified.');
 }
 
 console.log('▶ Test 8: Verifying Auto-Cleanup Service Logic (cutoff date & keep_latest filtering)');
@@ -263,7 +265,26 @@ async function testExternalUrlAndCleanedFlow() {
   const cleanedBody = await resCleaned.json();
   assert(cleanedBody.message.includes('已被存储自动清理策略归档清理'), 'Should inform user package is cleaned');
 
-  console.log('  ✅ External URL 302 redirect and Cleaned package 410 response verified successfully.');
+  // 3. Mock DB that points external_url to the gateway's own download URL (self-redirect loop defense)
+  const mockDbLoop = createMockDb({
+    id: 'v_loop',
+    app_id: 'test.app',
+    version_code: 300,
+    version_name: '3.0.0',
+    external_url: 'http://localhost/api/v1/app/download?app_id=test.app',
+    use_proxy: 0,
+    is_cleaned: 0,
+    is_published: 1,
+    file_name: 'test-app.apk',
+  });
+
+  const reqLoop = new Request('http://localhost/api/v1/app/download?app_id=test.app&version_code=300');
+  const resLoop = await app.fetch(reqLoop, { DB: mockDbLoop });
+  assert.strictEqual(resLoop.status, 400, 'Self-redirecting download URL must be intercepted with HTTP 400');
+  const loopBody = await resLoop.json();
+  assert(loopBody.message.includes('不能指向当前网关自身的下载接口'), 'Must return informative loop prevention error');
+
+  console.log('  ✅ External URL 302 redirect, Cleaned package 410, and Loop Prevention 400 verified successfully.');
 }
 
 async function main() {

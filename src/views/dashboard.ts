@@ -1231,7 +1231,7 @@ val downloadReq = Request.Builder()
         <div id="pkg-sec-external" class="form-group hidden">
           <label class="form-label">第三方 APK 下载直链 (URL) *</label>
           <input type="url" id="ver-form-exturl" class="form-control mono" placeholder="https://cdn.example.com/apps/app-v1.2.0.apk" oninput="checkReleaseSubmitReady()" />
-          <div class="form-help">可填入 CDN、GitHub Release、网盘直链等任何可以直接下载的外部链接</div>
+          <div class="form-help" style="color: #fbbf24;">⚠️ 请填写外部源站真实公开文件直链（如 GitHub Release、自建 CDN、对象存储等）。切勿填写当前网关自身的 /api/v1/app/download 地址！</div>
 
           <div class="switch-wrap" style="margin-top: 0.75rem;">
             <div class="switch-info">
@@ -1292,6 +1292,87 @@ val downloadReq = Request.Builder()
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-release-version')">取消</button>
           <button type="submit" id="btn-release-submit" class="btn btn-primary" disabled>上传并发布新版本</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: 编辑历史版本信息 -->
+  <div id="modal-edit-version" class="modal-overlay">
+    <div class="modal-card" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="edit-ver-modal-title">编辑版本信息</h3>
+        <button class="modal-close" onclick="closeModal('modal-edit-version')">&times;</button>
+      </div>
+      <form id="form-edit-version" onsubmit="handleUpdateVersion(event)">
+        <input type="hidden" id="edit-ver-id" />
+        <input type="hidden" id="edit-ver-appid" />
+
+        <div class="form-row">
+          <div class="form-col form-group">
+            <label class="form-label">版本名称 (versionName) *</label>
+            <input type="text" id="edit-ver-name" class="form-control" placeholder="1.2.0" required />
+          </div>
+          <div class="form-col form-group">
+            <label class="form-label">版本号 (versionCode 整数)</label>
+            <input type="number" id="edit-ver-code" class="form-control mono" readonly disabled style="opacity: 0.7; cursor: not-allowed;" />
+            <div class="form-help">版本号作为唯一标识不可修改</div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-col form-group">
+            <label class="form-label">发布渠道 (channel)</label>
+            <input type="text" id="edit-ver-channel" class="form-control" placeholder="default / beta" />
+          </div>
+          <div class="form-col form-group">
+            <label class="form-label">最低兼容版本号 (minVersionCode)</label>
+            <input type="number" id="edit-ver-mincode" class="form-control mono" placeholder="低于此版本将强制更新" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">下载保存文件名 (fileName)</label>
+          <input type="text" id="edit-ver-filename" class="form-control" placeholder="app-v1.2.0.apk" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">第三方 APK 下载直链 (URL)</label>
+          <input type="url" id="edit-ver-exturl" class="form-control mono" placeholder="https://cdn.example.com/apps/app-v1.2.0.apk" />
+          <div class="form-help" style="color: #fbbf24;">⚠️ 填写外部源站真实公开文件直链；切勿填写当前网关自身的 /api/v1/app/download 地址。留空代表使用 R2 存储原安装包。</div>
+        </div>
+
+        <div class="switch-wrap" style="margin-bottom: 1rem;">
+          <div class="switch-info">
+            <span class="switch-title">开启边缘反向代理加速 (Reverse Proxy)</span>
+            <span class="switch-desc">默认关闭为 302 重定向到第三方直链；开启后由 Edge 节点代理流式传输，隐藏源站并支持断点续传</span>
+          </div>
+          <input type="checkbox" id="edit-ver-useproxy" class="switch-checkbox" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">版本更新日志 (Changelog)</label>
+          <textarea id="edit-ver-log" class="form-control" style="min-height: 80px;" placeholder="- 优化下载性能与断点续传&#10;- 修复已知Bug"></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-col switch-wrap">
+            <div class="switch-info">
+              <span class="switch-title">强制更新</span>
+            </div>
+            <input type="checkbox" id="edit-ver-force" class="switch-checkbox" />
+          </div>
+          <div class="form-col switch-wrap">
+            <div class="switch-info">
+              <span class="switch-title">上架发布状态</span>
+            </div>
+            <input type="checkbox" id="edit-ver-published" class="switch-checkbox" />
+          </div>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 1.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-edit-version')">取消</button>
+          <button type="submit" class="btn btn-primary" id="btn-edit-ver-submit">保存修改</button>
         </div>
       </form>
     </div>
@@ -1664,6 +1745,9 @@ val downloadReq = Request.Builder()
         const data = await res.json();
         if (data.code === 0) {
           const versions = data.data || [];
+          window.__appVersions = window.__appVersions || {};
+          window.__appVersions[appId] = versions;
+
           if (!versions.length) {
             content.innerHTML = '<div style="color: var(--text-dim); font-size: 0.85rem;">该应用暂无发布任何版本</div>';
             return;
@@ -1685,7 +1769,7 @@ val downloadReq = Request.Builder()
                     \${v.is_force_update ? '<span class="badge badge-warning">强制更新</span>' : ''}
                     \${v.is_published ? '<span class="badge badge-success">已发布</span>' : '<span class="badge">已下架</span>'}
                     \${isCleaned ? '<span class="badge badge-warning" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;">📦 安装包已清理</span>' : ''}
-                    \${isExternal ? \`<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">🌐 第三方外链\${useProxy ? ' (反代)' : ''}</span>\` : ''}
+                    \${isExternal ? \`<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">🌐 \${useProxy ? '反代外链' : '302外链'}</span>\` : ''}
                   </div>
                   \${v.changelog ? \`<div class="ver-log">\${v.changelog}</div>\` : ''}
                   <div class="ver-meta">
@@ -1698,7 +1782,8 @@ val downloadReq = Request.Builder()
                   \${isCleaned ? '<div style="font-size: 0.75rem; color: #fbbf24; margin-top: 4px;">⚠️ 该版本历史 APK 已被存储自动清理策略物理清理，历史发布记录完整保留。</div>' : ''}
                 </div>
 
-                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                  <button class="btn btn-secondary btn-sm" onclick="openEditVersionModal('\${v.id}', '\${v.app_id}')">编辑</button>
                   \${isCleaned 
                     ? '<button class="btn btn-secondary btn-sm" disabled style="opacity: 0.5; cursor: not-allowed;" title="安装包已被自动策略清理">安装包已清理</button>'
                     : \`<button class="btn btn-secondary btn-sm" onclick="copyText('\${downloadUrl}', '指定版本下载链接已复制')">复制下载链接</button>\`
@@ -1711,6 +1796,85 @@ val downloadReq = Request.Builder()
         }
       } catch (err) {
         content.innerHTML = '<div style="color: var(--danger);">加载失败</div>';
+      }
+    }
+
+    function openEditVersionModal(versionId, appId) {
+      const versions = (window.__appVersions && window.__appVersions[appId]) || [];
+      const v = versions.find(item => item.id === versionId);
+      if (!v) {
+        showToast('未找到该版本记录', 'error');
+        return;
+      }
+
+      document.getElementById('edit-ver-modal-title').innerText = \`编辑版本 - v\${v.version_name} (Code: \${v.version_code})\`;
+      document.getElementById('edit-ver-id').value = v.id;
+      document.getElementById('edit-ver-appid').value = v.app_id;
+      document.getElementById('edit-ver-name').value = v.version_name || '';
+      document.getElementById('edit-ver-code').value = v.version_code || 0;
+      document.getElementById('edit-ver-channel').value = v.channel || 'default';
+      document.getElementById('edit-ver-mincode').value = v.min_version_code || 0;
+      document.getElementById('edit-ver-filename').value = v.file_name || '';
+      document.getElementById('edit-ver-exturl').value = v.external_url || '';
+      document.getElementById('edit-ver-useproxy').checked = v.use_proxy === 1;
+      document.getElementById('edit-ver-log').value = v.changelog || '';
+      document.getElementById('edit-ver-force').checked = v.is_force_update === 1;
+      document.getElementById('edit-ver-published').checked = v.is_published === 1;
+
+      openModal('modal-edit-version');
+    }
+
+    async function handleUpdateVersion(e) {
+      e.preventDefault();
+      const versionId = document.getElementById('edit-ver-id').value;
+      const appId = document.getElementById('edit-ver-appid').value;
+      const extUrl = document.getElementById('edit-ver-exturl').value.trim();
+
+      if (extUrl && (extUrl.startsWith(window.location.origin) || extUrl.includes('/api/v1/app/download'))) {
+        showToast('第三方直链不能填写当前网关自身的 /api/v1/app/download 地址，否则会造成死循环！', 'error');
+        return;
+      }
+
+      const payload = {
+        version_name: document.getElementById('edit-ver-name').value.trim(),
+        channel: document.getElementById('edit-ver-channel').value.trim() || 'default',
+        min_version_code: parseInt(document.getElementById('edit-ver-mincode').value, 10) || 0,
+        file_name: document.getElementById('edit-ver-filename').value.trim(),
+        external_url: extUrl,
+        use_proxy: document.getElementById('edit-ver-useproxy').checked ? 1 : 0,
+        changelog: document.getElementById('edit-ver-log').value.trim(),
+        is_force_update: document.getElementById('edit-ver-force').checked ? 1 : 0,
+        is_published: document.getElementById('edit-ver-published').checked ? 1 : 0
+      };
+
+      const btn = document.getElementById('btn-edit-ver-submit');
+      btn.disabled = true;
+      btn.innerText = '正在保存...';
+
+      try {
+        const res = await apiRequest('/api/admin/versions/' + encodeURIComponent(versionId), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.code === 0) {
+          showToast('版本信息更新成功！');
+          closeModal('modal-edit-version');
+          // 重新刷新版本抽屉和应用列表
+          const safeId = appId.replace(/\\./g, '_');
+          const box = document.getElementById('versions-box-' + safeId);
+          if (box) box.classList.add('hidden');
+          await toggleVersionsDrawer(appId);
+          loadApps();
+        } else {
+          showToast(data.message, 'error');
+        }
+      } catch (err) {
+        showToast('更新失败: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '保存修改';
       }
     }
 
@@ -1906,6 +2070,10 @@ val downloadReq = Request.Builder()
       if (isExternalMode) {
         if (!extUrl) {
           showToast('请填写第三方下载直链', 'error');
+          return;
+        }
+        if (extUrl.startsWith(window.location.origin) || extUrl.includes('/api/v1/app/download')) {
+          showToast('第三方直链不能填写当前网关自身的 /api/v1/app/download 地址，否则会造成死循环！', 'error');
           return;
         }
       } else {
