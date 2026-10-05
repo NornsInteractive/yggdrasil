@@ -111,28 +111,85 @@ clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c
 
         // 处理第三方源站返回的异常状态码 (如 404, 403, 500 等)
         if (!proxyRes.ok) {
+          const isHtmlClient = (c.req.header('accept') || '').includes('text/html');
+          const isGithub = extUrl.includes('github.com');
           let extraHint = '';
-          if (proxyRes.status === 404 && extUrl.includes('github.com')) {
-            extraHint = '（提示：GitHub 私有仓库未授权访问会返回 404，请确保 Release 或仓库为 Public 公开状态，或使用公开可直接下载的 URL）';
+          if (proxyRes.status === 404 && isGithub) {
+            extraHint = '（提示：GitHub 私有仓库未授权访问会返回 404，请确保 Release 或仓库为 Public 公开状态，或直接在控制台上传文件到 R2 存储）';
           }
+
+          if (isHtmlClient) {
+            return c.html(`<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>反向代理下载失败 - Yggdrasil</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0b0f19; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 1.5rem; box-sizing: border-box; }
+    .card { background: #131b2e; border: 1px solid #1e293b; border-radius: 16px; padding: 2rem; max-width: 600px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+    h2 { color: #f87171; margin-top: 0; display: flex; align-items: center; gap: 0.5rem; font-size: 1.25rem; }
+    .msg { color: #cbd5e1; font-size: 0.95rem; line-height: 1.6; margin: 1rem 0; }
+    .box { background: #080c14; border: 1px solid #1e293b; border-radius: 8px; padding: 0.875rem 1rem; margin: 1rem 0; font-size: 0.85rem; color: #38bdf8; word-break: break-all; font-family: monospace; }
+    .hint { background: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 1rem; border-radius: 6px; color: #fbbf24; font-size: 0.875rem; margin: 1.25rem 0; line-height: 1.6; }
+    .hint strong { color: #fef08a; }
+    .btn { display: inline-block; background: #2563eb; color: #fff; text-decoration: none; padding: 0.65rem 1.5rem; border-radius: 8px; font-size: 0.9rem; font-weight: 600; margin-top: 0.5rem; transition: background 0.2s; }
+    .btn:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>⚠️ 反向代理下载失败</h2>
+    <div class="msg">Edge 节点尝试代理拉取第三方安装包时，源站返回了异常状态：<strong>HTTP ${proxyRes.status} (${proxyRes.statusText})</strong></div>
+    <div class="box">${extUrl}</div>
+    ${isGithub ? `
+    <div class="hint">
+      <strong>💡 排查原因：GitHub 私有仓库限制</strong><br>
+      检测到目标为 GitHub Release 链接。若仓库为 <strong>Private（私有）</strong>，GitHub 严禁任何未登录的外部请求直接下载 Release 资源并固定返回 404。<br><br>
+      <strong>建议解决方案：</strong><br>
+      1. <strong>将 GitHub 仓库设为 Public 公开（推荐）：</strong>在 GitHub 仓库 Settings &rarr; Danger Zone 将可见性改为 Public，公开后直链及反代均可秒级生效下载；<br>
+      2. <strong>直接在后台上传 APK 至 R2：</strong>在 Yggdrasil 控制台选择「上传 APK 到 R2 存储」（支持大文件分片直传），无需依赖 GitHub 且国内外下载速度更快。
+    </div>` : ''}
+    <a href="/admin" class="btn">返回后台管理</a>
+  </div>
+</body>
+</html>`, 404);
+          }
+
+          // 非 HTML 浏览器请求 (如 APP 内检测或 curl) 返回 JSON，避免 502 状态触发 Cloudflare 页面拦截
           return c.json({
-            code: 502,
-            message: `反向代理下载第三方安装包失败: 第三方源站返回 HTTP ${proxyRes.status} (${proxyRes.statusText})。请检查外部下载链接是否有效且支持匿名公开访问。${extraHint}`,
-          }, 502);
+            code: 404,
+            message: `反向代理下载第三方安装包失败: 第三方源站返回 HTTP ${proxyRes.status} (${proxyRes.statusText})。${extraHint}`,
+            data: { status: proxyRes.status, upstream_url: extUrl },
+          }, 404);
         }
 
-        const resHeaders = new Headers(proxyRes.headers);
-        // 重要：Cloudflare Workers 的 fetch() 会自动解压缩上游 gzip/br 响应体。
-        // 如果保留上游的 content-encoding: gzip，浏览器二次解压时会报 ERR_CONTENT_DECODING_FAILED 崩溃。
-        // 故必须删除 content-encoding 和 content-length。
-        resHeaders.delete('content-encoding');
-        resHeaders.delete('content-length');
+        // 白名单提取有效响应头，避免透传 hop-by-hop (如 connection) 或上游安全策略 (CSP) 破坏客户端下载
+        const resHeaders = new Headers();
+        const contentType = proxyRes.headers.get('content-type');
+        if (contentType && !contentType.includes('text/html') && !contentType.includes('text/plain')) {
+          resHeaders.set('Content-Type', contentType);
+        } else {
+          resHeaders.set('Content-Type', 'application/vnd.android.package-archive');
+        }
 
         const fileName = version.file_name || `app-v${version.version_name}.apk`;
         resHeaders.set('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
         resHeaders.set('Accept-Ranges', 'bytes');
-        if (!resHeaders.has('Content-Type') || resHeaders.get('Content-Type')?.includes('text/')) {
-          resHeaders.set('Content-Type', 'application/vnd.android.package-archive');
+        resHeaders.set('Cache-Control', 'public, max-age=3600');
+
+        if (proxyRes.headers.has('etag')) {
+          resHeaders.set('ETag', proxyRes.headers.get('etag')!);
+        }
+        if (proxyRes.headers.has('last-modified')) {
+          resHeaders.set('Last-Modified', proxyRes.headers.get('last-modified')!);
+        }
+        if (proxyRes.status === 206 && proxyRes.headers.has('content-range')) {
+          resHeaders.set('Content-Range', proxyRes.headers.get('content-range')!);
+        }
+        // 若无 gzip 解压影响且存在准确 content-length，才回传 Content-Length
+        if (!proxyRes.headers.has('content-encoding') && proxyRes.headers.has('content-length')) {
+          resHeaders.set('Content-Length', proxyRes.headers.get('content-length')!);
         }
 
         return new Response(proxyRes.body, {
@@ -141,7 +198,7 @@ clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c
           headers: resHeaders,
         });
       } catch (err: any) {
-        return c.json({ code: 502, message: '反向代理下载第三方安装包失败: ' + err.message }, 502);
+        return c.json({ code: 500, message: '反向代理下载第三方安装包网络异常: ' + err.message }, 500);
       }
     }
 
