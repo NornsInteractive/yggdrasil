@@ -29,6 +29,56 @@ function getPackageContentType(fileName: string): string {
 }
 
 /**
+ * 根据 User-Agent 智能推断访客操作系统平台与 CPU 架构
+ */
+export function detectPlatformAndArchFromUa(ua: string): { platform?: string; arch?: string } {
+  if (!ua) return {};
+  const lower = ua.toLowerCase();
+
+  // 1. Android
+  if (lower.includes('android')) {
+    let arch = 'universal';
+    if (lower.includes('arm64') || lower.includes('aarch64')) arch = 'arm64-v8a';
+    else if (lower.includes('armeabi-v7a') || lower.includes('armv7')) arch = 'armeabi-v7a';
+    else if (lower.includes('x86_64')) arch = 'x86_64';
+    else if (lower.includes('x86')) arch = 'x86';
+    return { platform: 'android', arch };
+  }
+
+  // 2. Windows
+  if (lower.includes('windows') || lower.includes('win32') || lower.includes('win64')) {
+    let arch = 'x86_64';
+    if (lower.includes('arm64')) arch = 'arm64-v8a';
+    else if (lower.includes('win64') || lower.includes('x64') || lower.includes('wow64')) arch = 'x86_64';
+    else arch = 'x86';
+    return { platform: 'windows', arch };
+  }
+
+  // 3. macOS
+  if (lower.includes('macintosh') || lower.includes('mac os x')) {
+    let arch = 'universal';
+    if (lower.includes('arm64') || lower.includes('aarch64')) arch = 'apple-silicon';
+    else arch = 'x86_64';
+    return { platform: 'macos', arch };
+  }
+
+  // 4. iOS
+  if (lower.includes('iphone') || lower.includes('ipad') || lower.includes('ipod')) {
+    return { platform: 'ios', arch: 'universal' };
+  }
+
+  // 5. Linux
+  if (lower.includes('linux')) {
+    let arch = 'x86_64';
+    if (lower.includes('aarch64') || lower.includes('arm64')) arch = 'arm64-v8a';
+    else if (lower.includes('arm')) arch = 'armeabi-v7a';
+    return { platform: 'linux', arch };
+  }
+
+  return {};
+}
+
+/**
  * 客户端 App 版本检测接口
  * GET /api/v1/app/latest
  * GET /api/v1/version/check
@@ -45,8 +95,21 @@ const handleVersionCheck = async (c: any) => {
   const rawVersionCode = c.req.query('version_code') || c.req.query('versionCode') || '0';
   const currentVersionCode = parseInt(rawVersionCode, 10) || 0;
   const channel = c.req.query('channel') || 'default';
-  const platform = c.req.query('platform');
-  const arch = c.req.query('arch');
+  const rawPlatform = c.req.query('platform') || c.req.query('os');
+  const rawArch = c.req.query('arch') || c.req.query('architecture') || c.req.query('structure') || c.req.query('struct');
+
+  let platform = rawPlatform?.trim().toLowerCase();
+  let arch = rawArch?.trim().toLowerCase();
+
+  // 若未指定 platform，从 User-Agent 智能推断
+  if (!platform) {
+    const ua = c.req.header('user-agent') || '';
+    const detected = detectPlatformAndArchFromUa(ua);
+    if (detected.platform) {
+      platform = detected.platform;
+      if (!arch && detected.arch) arch = detected.arch;
+    }
+  }
 
   const originUrl = new URL(c.req.url).origin;
   const checkResult = await AppService.checkAppUpdate(
@@ -79,21 +142,36 @@ clientAppRoutes.get('/api/v1/version/check', tokenGuard('app_check'), handleVers
 /**
  * 客户端 App APK/安装包下载接口 (支持多平台/多架构分发与 HTTP Range 206 断点续传)
  * GET /api/v1/app/download
+ * GET /api/v1/app/:app_id/download
+ * GET /d/:app_id
  */
-clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c) => {
-  const appId = c.req.query('app_id') || c.req.query('appId');
+const handleAppDownload = async (c: any) => {
+  const appId = c.req.query('app_id') || c.req.query('appId') || c.req.param('app_id') || c.req.param('appId');
   if (!appId) {
-    return c.json({ code: 400, message: 'Missing required query parameter: app_id' }, 400);
+    return c.json({ code: 400, message: 'Missing required parameter: app_id' }, 400);
   }
 
   const rawVersionCode = c.req.query('version_code') || c.req.query('versionCode');
   const versionCode = rawVersionCode ? parseInt(rawVersionCode, 10) : undefined;
   const channel = c.req.query('channel') || 'default';
-  const platform = c.req.query('platform');
-  const arch = c.req.query('arch');
+  const rawPlatform = c.req.query('platform') || c.req.query('os');
+  const rawArch = c.req.query('arch') || c.req.query('architecture') || c.req.query('structure') || c.req.query('struct');
   const packageId = c.req.query('package_id') || c.req.query('packageId');
 
-  const version = await AppService.getVersionForDownload(c.env.DB, appId, versionCode, channel);
+  let platform = rawPlatform?.trim().toLowerCase();
+  let arch = rawArch?.trim().toLowerCase();
+
+  // 若未指定 platform 且未指定 packageId，从 User-Agent 智能推断
+  if (!platform && !packageId) {
+    const ua = c.req.header('user-agent') || '';
+    const detected = detectPlatformAndArchFromUa(ua);
+    if (detected.platform) {
+      platform = detected.platform;
+      if (!arch && detected.arch) arch = detected.arch;
+    }
+  }
+
+  const version = await AppService.getVersionForDownload(c.env.DB, appId, versionCode, channel, platform, arch);
   if (!version) {
     return c.json({ code: 404, message: 'Requested App version not found or not published' }, 404);
   }
@@ -293,4 +371,8 @@ clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c
     rangeHeader,
     getPackageContentType(finalFileName)
   );
-});
+};
+
+clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), handleAppDownload);
+clientAppRoutes.get('/api/v1/app/:app_id/download', tokenGuard('app_download'), handleAppDownload);
+clientAppRoutes.get('/d/:app_id', tokenGuard('app_download'), handleAppDownload);

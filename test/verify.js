@@ -188,11 +188,13 @@ async function testAppRouting() {
   assert(rootHtml.includes('modal-add-package'), 'Dashboard HTML should include add package modal');
   assert(rootHtml.includes('modal-edit-package'), 'Dashboard HTML should include edit package modal');
   assert(rootHtml.includes('openAddPackageModal'), 'Dashboard HTML should include openAddPackageModal function');
+  assert(rootHtml.includes('modal-app-download'), 'Dashboard HTML should include modal-app-download');
+  assert(rootHtml.includes('openAppDownloadModal'), 'Dashboard HTML should include openAppDownloadModal function');
   assert(rootHtml.includes('cfg-github-token'), 'Dashboard HTML should include GitHub token setting input');
   assert(rootHtml.includes('data-tab="mcp"'), 'Dashboard HTML should include MCP nav-tab');
   assert(rootHtml.includes('id="tab-mcp"'), 'Dashboard HTML should include tab-mcp section');
   assert(typeof app.scheduled === 'function', 'Worker export must include scheduled handler for Cron triggers');
-  console.log('  ✅ GET /, /admin, /health routing, Edit Version UI, Package Modal UI, GitHub Token UI, MCP Hub UI & scheduled cron handler verified.');
+  console.log('  ✅ GET /, /admin, /health routing, Edit Version UI, Package Modal UI, App Download Links UI, GitHub Token UI, MCP Hub UI & scheduled cron handler verified.');
 }
 
 console.log('▶ Test 8: Verifying Auto-Cleanup Service Logic (cutoff date & keep_latest filtering)');
@@ -673,7 +675,43 @@ async function testMultiPlatformPackages() {
   assert.strictEqual(dataLegacy.data.packages.length, 1);
   assert.strictEqual(dataLegacy.data.packages[0].platform, 'windows');
 
-  console.log('  ✅ Multi-platform matching, architecture filtering, package_id download, and legacy fallback verified.');
+  // 6. Latest version download via route param: /api/v1/app/:app_id/download
+  const resDlRoute = await app.fetch(
+    new Request('http://localhost/api/v1/app/com.norns.valhalla/download?platform=windows&arch=x86_64'),
+    { DB: mockDb }
+  );
+  assert.strictEqual(resDlRoute.status, 302);
+  assert.strictEqual(resDlRoute.headers.get('Location'), 'https://download.example.com/valhalla-win-x64.zip');
+
+  // 7. Latest version download via short link: /d/:app_id
+  const resDlShort = await app.fetch(
+    new Request('http://localhost/d/com.norns.valhalla?platform=android&arch=arm64-v8a'),
+    { DB: mockDb }
+  );
+  assert.strictEqual(resDlShort.status, 302);
+  assert.strictEqual(resDlShort.headers.get('Location'), 'https://download.example.com/valhalla-arm64.apk');
+
+  // 8. Auto-detect platform and arch from User-Agent header (Windows)
+  const resUaWin = await app.fetch(
+    new Request('http://localhost/d/com.norns.valhalla', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+    }),
+    { DB: mockDb }
+  );
+  assert.strictEqual(resUaWin.status, 302);
+  assert.strictEqual(resUaWin.headers.get('Location'), 'https://download.example.com/valhalla-win-x64.zip');
+
+  // 9. Auto-detect platform and arch from User-Agent header (Android)
+  const resUaAndroid = await app.fetch(
+    new Request('http://localhost/d/com.norns.valhalla', {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 14; Mobile; arm64) AppleWebKit/537.36' },
+    }),
+    { DB: mockDb }
+  );
+  assert.strictEqual(resUaAndroid.status, 302);
+  assert.strictEqual(resUaAndroid.headers.get('Location'), 'https://download.example.com/valhalla-arm64.apk');
+
+  console.log('  ✅ Multi-platform matching, architecture filtering, latest package download, UA auto-detection & short links verified.');
 }
 
 async function main() {

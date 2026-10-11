@@ -1251,27 +1251,30 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
 }</div>
         </div>
 
-        <!-- 接口 2: APK 下载 -->
+        <!-- 接口 2: 最新安装包下载与分发 -->
         <div class="stat-card" style="margin-bottom: 1.5rem;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
             <div style="display: flex; align-items: center; gap: 0.5rem;">
               <span class="badge badge-success" style="font-weight: 700;">GET</span>
               <span class="mono" style="font-size: 1rem; font-weight: 700;">/api/v1/app/download</span>
+              <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; font-weight: 700;">短链: /d/:app_id</span>
             </div>
             <button class="btn btn-secondary btn-sm" onclick="copyText(window.location.origin + '/api/v1/app/download', '接口路径已复制')">复制 URL</button>
           </div>
-          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem;">
-            安装包下载接口。支持 <code class="mono">platform</code>、<code class="mono">arch</code> 智能调度或 <code class="mono">package_id</code> 精准定位，原生支持 <b>HTTP Range 206 断点续传</b>，兼容 Windows、Android、macOS、iOS、Linux 等各大主流下载器。
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem; line-height: 1.6;">
+            <b>最新安装包下载接口</b>。无需传递 <code class="mono">version_code</code> 即可默认下载当前应用的最新发布版本。支持加上 <code class="mono">platform</code> 与 <code class="mono">arch</code>（如 Windows x86_64、Android arm64-v8a、macOS apple-silicon 等），自动匹配下载对应的最新安装包；若未传参，Edge 边缘节点将根据访客 User-Agent 智能推断匹配。支持 <b>HTTP Range 206 断点续传</b>。
           </p>
-          <div class="code-box"># 断点续传测试 (分片请求 Range: bytes=0-1023)
-curl -i -H "Range: bytes=0-1023" "https://your-worker.workers.dev/api/v1/app/download?app_id=com.example.app&platform=windows&arch=x86_64"
+          <div class="code-box"># 1. 显式指定平台与架构下载最新版 (如 Windows 64位)
+curl -L -O "https://your-worker.workers.dev/api/v1/app/download?app_id=com.example.app&platform=windows&arch=x86_64"
 
-# 返回响应头:
-HTTP/1.1 206 Partial Content
-Content-Type: application/zip
-Accept-Ranges: bytes
-Content-Range: bytes 0-1023/45829104
-Content-Length: 1024</div>
+# 2. 显式指定平台与架构下载最新版 (如 Android arm64)
+curl -L -O "https://your-worker.workers.dev/api/v1/app/download?app_id=com.example.app&platform=android&arch=arm64-v8a"
+
+# 3. 极简短链自适应下载 (自动识别系统或下载默认包)
+curl -L -O "https://your-worker.workers.dev/d/com.example.app"
+
+# 4. 断点续传测试 (分片请求 Range: bytes=0-1023)
+curl -i -H "Range: bytes=0-1023" "https://your-worker.workers.dev/api/v1/app/download?app_id=com.example.app&platform=windows&arch=x86_64"</div>
         </div>
 
         <!-- 接口 3: 通用文件 -->
@@ -1935,6 +1938,91 @@ val downloadReq = Request.Builder()
     </div>
   </div>
 
+  <!-- MODAL: 获取应用最新版多平台下载链接 -->
+  <div id="modal-app-download" class="modal-overlay">
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="dl-modal-title">📥 获取应用最新版下载链接</h3>
+        <button class="modal-close" onclick="closeModal('modal-app-download')">&times;</button>
+      </div>
+      <div style="padding: 1.25rem 1.5rem;">
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem; line-height: 1.6;">
+          以下直链始终<b>永久指向该应用的最新发布版本</b>。后续发布新版本时无需更换外部下载地址。支持通过添加 <code class="mono" style="color: #38bdf8;">platform</code> 和 <code class="mono" style="color: #38bdf8;">arch</code> 参数自动下载对应平台与架构的安装包。
+        </p>
+
+        <!-- 常用平台快捷直链 -->
+        <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 0.6rem; color: var(--text-main); display: flex; align-items: center; justify-content: space-between;">
+          <span>🌟 常用平台与架构快捷链接</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: normal;">点击复制或直接测试</span>
+        </div>
+        <div id="dl-quick-links" style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.25rem; max-height: 240px; overflow-y: auto; padding-right: 2px;">
+          <!-- JS 动态渲染 -->
+        </div>
+
+        <!-- 自定义参数生成器 -->
+        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: 8px; padding: 1rem;">
+          <div style="font-weight: 700; font-size: 0.875rem; margin-bottom: 0.75rem; color: var(--text-main);">
+            ⚙️ 定制特定平台与架构下载链接
+          </div>
+          <div class="form-row">
+            <div class="form-col form-group">
+              <label class="form-label">操作系统平台 (Platform)</label>
+              <select id="dl-custom-platform" class="form-control" onchange="updateCustomDownloadUrl()">
+                <option value="">（不限 / 自动识别访客系统）</option>
+                <option value="windows">Windows</option>
+                <option value="android">Android</option>
+                <option value="macos">macOS</option>
+                <option value="linux">Linux</option>
+                <option value="ios">iOS</option>
+                <option value="universal">Universal (通用)</option>
+              </select>
+            </div>
+            <div class="form-col form-group">
+              <label class="form-label">CPU 架构 (Arch)</label>
+              <select id="dl-custom-arch" class="form-control" onchange="updateCustomDownloadUrl()">
+                <option value="">（不限 / 默认架构）</option>
+                <option value="universal">universal (通用架构)</option>
+                <option value="x86_64">x86_64 (64位 Intel/AMD)</option>
+                <option value="arm64-v8a">arm64-v8a (64位 ARM)</option>
+                <option value="armeabi-v7a">armeabi-v7a (32位 ARM)</option>
+                <option value="apple-silicon">apple-silicon (M系列芯片)</option>
+                <option value="x86">x86 (32位 PC)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-col form-group" style="margin-bottom: 0.5rem;">
+              <label class="form-label">发布渠道 (Channel)</label>
+              <input type="text" id="dl-custom-channel" class="form-control mono" value="default" placeholder="default" oninput="updateCustomDownloadUrl()" />
+            </div>
+          </div>
+
+          <div style="margin-top: 0.75rem;">
+            <label class="form-label">标准 API 下载链接：</label>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <input type="text" id="dl-result-url" class="form-control mono" readonly style="font-size: 0.8rem; background: var(--bg-card);" />
+              <button class="btn btn-secondary btn-sm" onclick="copyInput('dl-result-url', '标准最新版下载链接已复制')">复制</button>
+              <a id="dl-result-btn" href="#" target="_blank" class="btn btn-primary btn-sm" style="text-decoration: none;">直接下载</a>
+            </div>
+          </div>
+
+          <div style="margin-top: 0.75rem;">
+            <label class="form-label">极简短链 (Short Link)：</label>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <input type="text" id="dl-short-url" class="form-control mono" readonly style="font-size: 0.8rem; background: var(--bg-card);" />
+              <button class="btn btn-secondary btn-sm" onclick="copyInput('dl-short-url', '极简短链已复制')">复制</button>
+              <a id="dl-short-btn" href="#" target="_blank" class="btn btn-secondary btn-sm" style="text-decoration: none;">直接下载</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 1.25rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-app-download')">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST CONTAINER -->
   <div id="toast-container" class="toast-container"></div>
 
@@ -1979,6 +2067,82 @@ val downloadReq = Request.Builder()
         input.remove();
         showToast(successMsg);
       });
+    }
+
+    function copyInput(id, successMsg = '已复制') {
+      const el = document.getElementById(id);
+      if (el) copyText(el.value, successMsg);
+    }
+
+    let currentDlModalAppId = '';
+    function openAppDownloadModal(appId, appName) {
+      currentDlModalAppId = appId;
+      document.getElementById('dl-modal-title').textContent = '📥 ' + appName + ' - 最新版下载链接';
+      document.getElementById('dl-custom-platform').value = '';
+      document.getElementById('dl-custom-arch').value = '';
+      document.getElementById('dl-custom-channel').value = 'default';
+
+      const origin = window.location.origin;
+      const presets = [
+        { label: '🌐 全平台自适应 (自动识别 User-Agent)', desc: '直接访问，系统自动识别访客的操作系统与架构匹配下载', plat: '', arch: '' },
+        { label: '🪟 Windows (x86_64)', desc: '自动匹配下载最新 Windows 64位安装包', plat: 'windows', arch: 'x86_64' },
+        { label: '🤖 Android (arm64-v8a)', desc: '自动匹配下载最新主流 Android 64位 APK', plat: 'android', arch: 'arm64-v8a' },
+        { label: '🤖 Android (通用/Universal)', desc: '自动匹配下载最新 Android 通用 APK', plat: 'android', arch: 'universal' },
+        { label: '🍏 macOS (Apple Silicon M系列)', desc: '自动匹配下载最新 Mac M系列芯片安装包', plat: 'macos', arch: 'apple-silicon' },
+        { label: '🍏 macOS (Intel x86_64)', desc: '自动匹配下载最新 Mac Intel芯片安装包', plat: 'macos', arch: 'x86_64' },
+        { label: '🐧 Linux (x86_64)', desc: '自动匹配下载最新 Linux 64位软件包', plat: 'linux', arch: 'x86_64' },
+        { label: '📦 Universal (全架构通用)', desc: '下载全平台/架构通用分发包', plat: 'universal', arch: 'universal' },
+      ];
+
+      const container = document.getElementById('dl-quick-links');
+      container.innerHTML = presets.map(p => {
+        let url = \`\${origin}/api/v1/app/download?app_id=\${encodeURIComponent(appId)}\`;
+        if (p.plat) url += \`&platform=\${encodeURIComponent(p.plat)}\`;
+        if (p.arch) url += \`&arch=\${encodeURIComponent(p.arch)}\`;
+
+        return \`
+          <div style="background: var(--bg-hover); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.6rem 0.8rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
+            <div>
+              <div style="font-weight: 600; font-size: 0.825rem; color: var(--text-main);">\${p.label}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted);">\${p.desc}</div>
+            </div>
+            <div style="display: flex; gap: 0.4rem;">
+              <button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;" onclick="copyText('\${url}', '\${p.label} 下载链接已复制')">复制链接</button>
+              <a href="\${url}" target="_blank" class="btn btn-primary btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.6rem; text-decoration: none;">直接下载</a>
+            </div>
+          </div>
+        \`;
+      }).join('');
+
+      updateCustomDownloadUrl();
+      openModal('modal-app-download');
+    }
+
+    function updateCustomDownloadUrl() {
+      if (!currentDlModalAppId) return;
+      const plat = document.getElementById('dl-custom-platform').value;
+      const arch = document.getElementById('dl-custom-arch').value;
+      const channel = (document.getElementById('dl-custom-channel').value || '').trim();
+
+      const origin = window.location.origin;
+      let params = new URLSearchParams();
+      params.set('app_id', currentDlModalAppId);
+      if (channel && channel !== 'default') params.set('channel', channel);
+      if (plat) params.set('platform', plat);
+      if (arch) params.set('arch', arch);
+
+      const fullUrl = \`\${origin}/api/v1/app/download?\${params.toString()}\`;
+      document.getElementById('dl-result-url').value = fullUrl;
+      document.getElementById('dl-result-btn').href = fullUrl;
+
+      let shortParams = new URLSearchParams();
+      if (channel && channel !== 'default') shortParams.set('channel', channel);
+      if (plat) shortParams.set('platform', plat);
+      if (arch) shortParams.set('arch', arch);
+      const qStr = shortParams.toString();
+      const shortUrl = \`\${origin}/d/\${encodeURIComponent(currentDlModalAppId)}\${qStr ? '?' + qStr : ''}\`;
+      document.getElementById('dl-short-url').value = shortUrl;
+      document.getElementById('dl-short-btn').href = shortUrl;
     }
 
     function openModal(id) {
@@ -2159,10 +2323,11 @@ val downloadReq = Request.Builder()
               </div>
 
               <div class="app-actions">
-                <button class="btn btn-primary btn-sm" onclick="openReleaseModal('\${app.app_id}', '\${app.name}')">+ 发布新版本</button>
+                <button class="btn btn-primary btn-sm" onclick="openReleaseModal('\${app.app_id}', '\${app.name.replace(/'/g, "\\'")}')">+ 发布新版本</button>
                 <button class="btn btn-secondary btn-sm" onclick="toggleVersionsDrawer('\${app.app_id}')">历史版本 (\${app.version_count || 0})</button>
+                <button class="btn btn-secondary btn-sm" onclick="openAppDownloadModal('\${app.app_id}', '\${(app.name || app.app_id).replace(/'/g, "\\'")}')">📥 最新下载链接</button>
                 <button class="btn btn-secondary btn-sm" onclick="copyText('\${checkApiUrl}', '版本检测接口 URL 已复制')">复制检测 API</button>
-                <button class="btn btn-secondary btn-sm" onclick="copyText('\${downloadUrl}', '最新版下载链接已复制')">复制下载链接</button>
+                <button class="btn btn-secondary btn-sm" onclick="copyText('\${downloadUrl}', '最新版下载链接已复制')">复制直链</button>
                 <button class="btn btn-danger btn-sm" onclick="deleteApp('\${app.app_id}')">删除应用</button>
               </div>
             </div>
@@ -3171,10 +3336,20 @@ val downloadReq = Request.Builder()
       if (platform) url += \`&platform=\${encodeURIComponent(platform)}\`;
       if (arch) url += \`&arch=\${encodeURIComponent(arch)}\`;
       
-      let cmd = \`curl -s "\${url}"\`;
+      let dlUrl = \`\${origin}/api/v1/app/download?app_id=\${encodeURIComponent(appId)}\`;
+      if (channel && channel !== 'default') dlUrl += \`&channel=\${encodeURIComponent(channel)}\`;
+      if (platform) dlUrl += \`&platform=\${encodeURIComponent(platform)}\`;
+      if (arch) dlUrl += \`&arch=\${encodeURIComponent(arch)}\`;
+
+      let cmd = \`# 1. 客户端版本检测请求\\ncurl -s "\${url}"\`;
       if (token) {
-        cmd = \`curl -s -H "X-Ygg-Token: \${token}" "\${url}"\`;
+        cmd = \`# 1. 客户端版本检测请求\\ncurl -s -H "X-Ygg-Token: \${token}" "\${url}"\`;
       }
+      cmd += \`\\n\\n# 2. 最新安装包直接下载 (支持多平台/架构匹配)\\ncurl -L -O "\${dlUrl}"\`;
+      if (token) {
+        cmd += \` -H "X-Ygg-Token: \${token}"\`;
+      }
+      cmd += \`\\n\\n# 3. 极简短链下载\\ncurl -L -O "\${origin}/d/\${encodeURIComponent(appId)}\${platform ? '?platform=' + encodeURIComponent(platform) : ''}"\`;
 
       document.getElementById('pg-curl').innerText = cmd;
     }

@@ -51,6 +51,13 @@ app.use('/api/*', async (c, next) => {
   await next();
 });
 
+app.use('/d/*', async (c, next) => {
+  if (!c.env || !c.env.DB) {
+    return c.json({ code: 500, message: 'D1 database binding missing' }, 500);
+  }
+  await next();
+});
+
 // 2. Web 控制台前端页面路由 (直接返回单页 Web Dashboard)
 const serveDashboard = (c: any) => {
   const siteTitle = c.env?.APP_NAME 

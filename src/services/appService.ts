@@ -690,13 +690,143 @@ export class AppService {
   }
 
   /**
-   * 获取指定的最新已发布版本 (供客户端检测更新)
+   * 获取指定的最新已发布版本 (供客户端检测更新与下载，支持按平台与架构智能匹配)
    */
   static async getLatestPublishedVersion(
     db: D1Database,
     appId: string,
-    channel: string = 'default'
+    channel: string = 'default',
+    platform?: string,
+    arch?: string
   ): Promise<AppVersionEntity | null> {
+    await this.ensureSchema(db);
+
+    const reqPlat = platform?.trim().toLowerCase();
+    const reqArch = arch?.trim().toLowerCase();
+
+    // 1. 若指定了 platform，优先查找包含对应平台 (及架构) 分发包的最新已发布版本
+    if (reqPlat) {
+      let platVersion: AppVersionEntity | null = null;
+
+      // 1.1 若同时指定了 arch，优先尝试平台与架构双匹配
+      if (reqArch) {
+        platVersion = await db.prepare(`
+          SELECT v.* FROM app_versions v 
+          WHERE v.app_id = ? AND v.channel = ? AND v.is_published = 1 
+          AND (
+            EXISTS (
+              SELECT 1 FROM version_packages vp 
+              WHERE vp.version_id = v.id 
+              AND (LOWER(vp.platform) = ? OR LOWER(vp.platform) = 'universal' OR LOWER(vp.platform) = 'all')
+              AND (LOWER(vp.arch) = ? OR LOWER(vp.arch) = 'universal' OR LOWER(vp.arch) = 'all')
+            )
+            OR (
+              (COALESCE(LOWER(v.platform), 'android') = ? OR COALESCE(LOWER(v.platform), 'android') = 'universal')
+              AND (COALESCE(LOWER(v.arch), 'universal') = ? OR COALESCE(LOWER(v.arch), 'universal') = 'universal')
+            )
+          )
+          ORDER BY v.version_code DESC, v.created_at DESC 
+          LIMIT 1
+        `).bind(appId, channel, reqPlat, reqArch, reqPlat, reqArch).first<AppVersionEntity>();
+
+        if (!platVersion && channel !== 'default') {
+          platVersion = await db.prepare(`
+            SELECT v.* FROM app_versions v 
+            WHERE v.app_id = ? AND v.channel = 'default' AND v.is_published = 1 
+            AND (
+              EXISTS (
+                SELECT 1 FROM version_packages vp 
+                WHERE vp.version_id = v.id 
+                AND (LOWER(vp.platform) = ? OR LOWER(vp.platform) = 'universal' OR LOWER(vp.platform) = 'all')
+                AND (LOWER(vp.arch) = ? OR LOWER(vp.arch) = 'universal' OR LOWER(vp.arch) = 'all')
+              )
+              OR (
+                (COALESCE(LOWER(v.platform), 'android') = ? OR COALESCE(LOWER(v.platform), 'android') = 'universal')
+                AND (COALESCE(LOWER(v.arch), 'universal') = ? OR COALESCE(LOWER(v.arch), 'universal') = 'universal')
+              )
+            )
+            ORDER BY v.version_code DESC, v.created_at DESC 
+            LIMIT 1
+          `).bind(appId, reqPlat, reqArch, reqPlat, reqArch).first<AppVersionEntity>();
+        }
+      }
+
+      // 1.2 若未指定 arch 或 架构双匹配未命中，匹配平台
+      if (!platVersion) {
+        platVersion = await db.prepare(`
+          SELECT v.* FROM app_versions v 
+          WHERE v.app_id = ? AND v.channel = ? AND v.is_published = 1 
+          AND (
+            EXISTS (
+              SELECT 1 FROM version_packages vp 
+              WHERE vp.version_id = v.id 
+              AND (LOWER(vp.platform) = ? OR LOWER(vp.platform) = 'universal' OR LOWER(vp.platform) = 'all')
+            )
+            OR (COALESCE(LOWER(v.platform), 'android') = ? OR COALESCE(LOWER(v.platform), 'android') = 'universal')
+          )
+          ORDER BY v.version_code DESC, v.created_at DESC 
+          LIMIT 1
+        `).bind(appId, channel, reqPlat, reqPlat).first<AppVersionEntity>();
+
+        if (!platVersion && channel !== 'default') {
+          platVersion = await db.prepare(`
+            SELECT v.* FROM app_versions v 
+            WHERE v.app_id = ? AND v.channel = 'default' AND v.is_published = 1 
+            AND (
+              EXISTS (
+                SELECT 1 FROM version_packages vp 
+                WHERE vp.version_id = v.id 
+                AND (LOWER(vp.platform) = ? OR LOWER(vp.platform) = 'universal' OR LOWER(vp.platform) = 'all')
+              )
+              OR (COALESCE(LOWER(v.platform), 'android') = ? OR COALESCE(LOWER(v.platform), 'android') = 'universal')
+            )
+            ORDER BY v.version_code DESC, v.created_at DESC 
+            LIMIT 1
+          `).bind(appId, reqPlat, reqPlat).first<AppVersionEntity>();
+        }
+      }
+
+      if (platVersion) return platVersion;
+    }
+
+    // 2. 若仅指定了 arch，尝试架构匹配
+    if (reqArch) {
+      let archVersion = await db.prepare(`
+        SELECT v.* FROM app_versions v 
+        WHERE v.app_id = ? AND v.channel = ? AND v.is_published = 1 
+        AND (
+          EXISTS (
+            SELECT 1 FROM version_packages vp 
+            WHERE vp.version_id = v.id 
+            AND (LOWER(vp.arch) = ? OR LOWER(vp.arch) = 'universal' OR LOWER(vp.arch) = 'all')
+          )
+          OR (COALESCE(LOWER(v.arch), 'universal') = ? OR COALESCE(LOWER(v.arch), 'universal') = 'universal')
+        )
+        ORDER BY v.version_code DESC, v.created_at DESC 
+        LIMIT 1
+      `).bind(appId, channel, reqArch, reqArch).first<AppVersionEntity>();
+
+      if (!archVersion && channel !== 'default') {
+        archVersion = await db.prepare(`
+          SELECT v.* FROM app_versions v 
+          WHERE v.app_id = ? AND v.channel = 'default' AND v.is_published = 1 
+          AND (
+            EXISTS (
+              SELECT 1 FROM version_packages vp 
+              WHERE vp.version_id = v.id 
+              AND (LOWER(vp.arch) = ? OR LOWER(vp.arch) = 'universal' OR LOWER(vp.arch) = 'all')
+            )
+            OR (COALESCE(LOWER(v.arch), 'universal') = ? OR COALESCE(LOWER(v.arch), 'universal') = 'universal')
+          )
+          ORDER BY v.version_code DESC, v.created_at DESC 
+          LIMIT 1
+        `).bind(appId, reqArch, reqArch).first<AppVersionEntity>();
+      }
+
+      if (archVersion) return archVersion;
+    }
+
+    // 3. 通用兜底逻辑：查询该渠道下的最新已发布版本
     let version = await db.prepare(`
       SELECT * FROM app_versions 
       WHERE app_id = ? AND channel = ? AND is_published = 1 
@@ -718,13 +848,15 @@ export class AppService {
   }
 
   /**
-   * 根据版本号获取指定版本的下载元数据
+   * 根据版本号获取指定版本的下载元数据 (未指定版本号时返回匹配平台/架构的最新版本)
    */
   static async getVersionForDownload(
     db: D1Database,
     appId: string,
     versionCode?: number,
-    channel: string = 'default'
+    channel: string = 'default',
+    platform?: string,
+    arch?: string
   ): Promise<AppVersionEntity | null> {
     if (versionCode !== undefined && !isNaN(versionCode) && versionCode > 0) {
       const ver = await db.prepare(`
@@ -735,7 +867,7 @@ export class AppService {
       if (ver) return ver;
     }
 
-    return await this.getLatestPublishedVersion(db, appId, channel);
+    return await this.getLatestPublishedVersion(db, appId, channel, platform, arch);
   }
 
   /**
@@ -837,7 +969,7 @@ export class AppService {
     const app = await this.getAppByAppId(db, appId);
     if (!app) return null;
 
-    const latest = await this.getLatestPublishedVersion(db, appId, channel);
+    const latest = await this.getLatestPublishedVersion(db, appId, channel, platform, arch);
     if (!latest) return null;
 
     const hasUpdate = latest.version_code > currentVersionCode;
