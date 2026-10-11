@@ -708,7 +708,7 @@ export class AppService {
     if (reqPlat) {
       let platVersion: AppVersionEntity | null = null;
 
-      // 1.1 若同时指定了 arch，优先尝试平台与架构双匹配
+      // 1.1 若同时指定了 arch，必须同时满足平台与架构双匹配 (或 universal)
       if (reqArch) {
         platVersion = await db.prepare(`
           SELECT v.* FROM app_versions v 
@@ -749,10 +749,10 @@ export class AppService {
             LIMIT 1
           `).bind(appId, reqPlat, reqArch, reqPlat, reqArch).first<AppVersionEntity>();
         }
-      }
 
-      // 1.2 若未指定 arch 或 架构双匹配未命中，匹配平台
-      if (!platVersion) {
+        return platVersion || null;
+      } else {
+        // 1.2 未指定 arch 时，匹配平台 (及 universal)
         platVersion = await db.prepare(`
           SELECT v.* FROM app_versions v 
           WHERE v.app_id = ? AND v.channel = ? AND v.is_published = 1 
@@ -784,9 +784,9 @@ export class AppService {
             LIMIT 1
           `).bind(appId, reqPlat, reqPlat).first<AppVersionEntity>();
         }
-      }
 
-      if (platVersion) return platVersion;
+        return platVersion || null;
+      }
     }
 
     // 2. 若仅指定了 arch，尝试架构匹配
@@ -824,9 +824,10 @@ export class AppService {
       }
 
       if (archVersion) return archVersion;
+      return null;
     }
 
-    // 3. 通用兜底逻辑：查询该渠道下的最新已发布版本
+    // 3. 通用兜底逻辑：查询该渠道下的最新已发布版本 (仅在未限定 platform 和 arch 时执行)
     let version = await db.prepare(`
       SELECT * FROM app_versions 
       WHERE app_id = ? AND channel = ? AND is_published = 1 
@@ -871,7 +872,7 @@ export class AppService {
   }
 
   /**
-   * 为指定版本匹配最适合当前平台与架构的安装包
+   * 为指定版本匹配最适合当前平台与架构的安装包 (若指定了平台或架构且无匹配，严格返回 null，绝不随意下载错误架构安装包)
    */
   static async getPackageForDownload(
     db: D1Database,
@@ -879,13 +880,14 @@ export class AppService {
     platform?: string,
     arch?: string,
     packageId?: string
-  ): Promise<VersionPackageEntity> {
+  ): Promise<VersionPackageEntity | null> {
     await this.ensureSchema(db);
 
     // 1. 如果显式指定了 packageId，优先精准查找
     if (packageId) {
       const pkg = await this.getPackageById(db, packageId);
       if (pkg && pkg.version_id === version.id) return pkg;
+      return null;
     }
 
     // 2. 查询该版本名下所有分发包
@@ -895,33 +897,71 @@ export class AppService {
       const reqPlat = platform?.trim().toLowerCase();
       const reqArch = arch?.trim().toLowerCase();
 
-      // 2.1 平台和架构完全精确匹配 (如 windows + x86_64)
+      // 2.1 平台和架构同时指定
       if (reqPlat && reqArch) {
+        // 精确匹配平台与架构
         const exact = pkgs.find(p => p.platform.toLowerCase() === reqPlat && p.arch.toLowerCase() === reqArch);
         if (exact) return exact;
-      }
 
-      // 2.2 平台匹配，架构为 universal 或 all
-      if (reqPlat) {
+        // 平台精准匹配，架构为 universal 或 all
         const platUni = pkgs.find(p => p.platform.toLowerCase() === reqPlat && (p.arch.toLowerCase() === 'universal' || p.arch.toLowerCase() === 'all'));
         if (platUni) return platUni;
 
-        // 2.3 平台匹配的任意安装包
-        const platAny = pkgs.find(p => p.platform.toLowerCase() === reqPlat);
-        if (platAny) return platAny;
+        // 通用平台包，架构精准匹配或 universal
+        const uniExact = pkgs.find(p => (p.platform.toLowerCase() === 'universal' || p.platform.toLowerCase() === 'all') && (p.arch.toLowerCase() === reqArch || p.arch.toLowerCase() === 'universal' || p.arch.toLowerCase() === 'all'));
+        if (uniExact) return uniExact;
+
+        // 无法匹配指定平台与架构，严格返回 null
+        return null;
       }
 
-      // 2.4 架构单独匹配
+      // 2.2 仅指定平台
+      if (reqPlat) {
+        // 平台匹配，架构优先 universal 或 all
+        const platUni = pkgs.find(p => p.platform.toLowerCase() === reqPlat && (p.arch.toLowerCase() === 'universal' || p.arch.toLowerCase() === 'all'));
+        if (platUni) return platUni;
+
+        // 平台匹配的任一包
+        const platAny = pkgs.find(p => p.platform.toLowerCase() === reqPlat);
+        if (platAny) return platAny;
+
+        // 通用平台包
+        const uniPlat = pkgs.find(p => p.platform.toLowerCase() === 'universal' || p.platform.toLowerCase() === 'all');
+        if (uniPlat) return uniPlat;
+
+        // 无匹配该平台的包，严格返回 null
+        return null;
+      }
+
+      // 2.3 仅指定架构
       if (reqArch) {
         const archMatch = pkgs.find(p => p.arch.toLowerCase() === reqArch);
         if (archMatch) return archMatch;
+
+        const archUni = pkgs.find(p => p.arch.toLowerCase() === 'universal' || p.arch.toLowerCase() === 'all');
+        if (archUni) return archUni;
+
+        // 无匹配该架构的包，严格返回 null
+        return null;
       }
 
-      // 2.5 默认返回该版本名下首个安装包
+      // 2.4 未指定任何平台或架构：返回该版本名下首个安装包
       return pkgs[0];
     }
 
     // 3. 兼容历史数据：若无独立分发包记录，从版本主记录字段合成
+    const vPlat = (version.platform || 'android').toLowerCase();
+    const vArch = (version.arch || 'universal').toLowerCase();
+    const reqPlat = platform?.trim().toLowerCase();
+    const reqArch = arch?.trim().toLowerCase();
+
+    if (reqPlat && vPlat !== reqPlat && vPlat !== 'universal' && vPlat !== 'all') {
+      return null;
+    }
+    if (reqArch && vArch !== reqArch && vArch !== 'universal' && vArch !== 'all') {
+      return null;
+    }
+
     return {
       id: 'pkg_def_' + version.id,
       version_id: version.id,
@@ -988,6 +1028,7 @@ export class AppService {
 
     // 匹配最适合当前平台与架构的安装包
     const matchedPkg = await this.getPackageForDownload(db, latest, platform, arch);
+    if (!matchedPkg) return null;
 
     // 获取该版本所有可用分发包列表
     const allPkgs = await this.listPackagesByVersionId(db, latest.id);

@@ -114,9 +114,12 @@ export async function executeMcpTool(
       );
 
       if (!updateData) {
+        const platArchDesc = [platform, arch].filter(Boolean).join(' / ');
         return {
           has_update: false,
-          message: `No published version found for app '${appId}' in channel '${channel}'`,
+          message: platArchDesc
+            ? `No published version or package found for app '${appId}' matching platform/arch '${platArchDesc}' in channel '${channel}'`
+            : `No published version found for app '${appId}' in channel '${channel}'`,
         };
       }
       return {

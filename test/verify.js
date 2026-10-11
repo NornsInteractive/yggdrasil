@@ -711,7 +711,59 @@ async function testMultiPlatformPackages() {
   assert.strictEqual(resUaAndroid.status, 302);
   assert.strictEqual(resUaAndroid.headers.get('Location'), 'https://download.example.com/valhalla-arm64.apk');
 
-  console.log('  ✅ Multi-platform matching, architecture filtering, latest package download, UA auto-detection & short links verified.');
+  // 10. Strictly return 404 when requested platform does not exist (No arbitrary package returned)
+  // App only has Windows x86_64 and Android arm64-v8a (no iOS and no universal package)
+  const specificOnlyDb = createMultiPkgMockDb([packagesList[0], packagesList[1]]);
+
+  // 10.1 JSON API download request for non-existent platform (ios)
+  const resDlNoIos = await app.fetch(
+    new Request('http://localhost/api/v1/app/download?app_id=com.norns.valhalla&platform=ios', {
+      headers: { 'Accept': 'application/json' }
+    }),
+    { DB: specificOnlyDb }
+  );
+  assert.strictEqual(resDlNoIos.status, 404, 'Non-existent platform package request must return HTTP 404');
+  const dataDlNoIos = await resDlNoIos.json();
+  assert.strictEqual(dataDlNoIos.code, 404);
+  assert(dataDlNoIos.message.includes('ios'));
+  assert.strictEqual(dataDlNoIos.data.available_packages.length, 2, 'Must provide available packages list');
+
+  // 10.2 HTML browser download request for non-existent platform (ios)
+  const resDlNoIosHtml = await app.fetch(
+    new Request('http://localhost/d/com.norns.valhalla?platform=ios', {
+      headers: { 'Accept': 'text/html,application/xhtml+xml' }
+    }),
+    { DB: specificOnlyDb }
+  );
+  assert.strictEqual(resDlNoIosHtml.status, 404, 'HTML request for non-existent platform must return HTTP 404');
+  const htmlDlNoIos = await resDlNoIosHtml.text();
+  assert(htmlDlNoIos.includes('未找到对应安装包'));
+  assert(htmlDlNoIos.includes('ios'));
+  assert(htmlDlNoIos.includes('Valhalla'));
+
+  // 10.3 Download request for platform with non-existent architecture (windows + arm64-v8a)
+  const resDlNoArch = await app.fetch(
+    new Request('http://localhost/api/v1/app/download?app_id=com.norns.valhalla&platform=windows&arch=arm64-v8a', {
+      headers: { 'Accept': 'application/json' }
+    }),
+    { DB: specificOnlyDb }
+  );
+  assert.strictEqual(resDlNoArch.status, 404, 'Non-existent architecture package request must return HTTP 404');
+  const dataDlNoArch = await resDlNoArch.json();
+  assert.strictEqual(dataDlNoArch.code, 404);
+  assert(dataDlNoArch.message.includes('arm64-v8a'));
+
+  // 10.4 Check update request for non-existent platform
+  const resCheckNoIos = await app.fetch(
+    new Request('http://localhost/api/v1/app/latest?app_id=com.norns.valhalla&platform=ios'),
+    { DB: specificOnlyDb }
+  );
+  assert.strictEqual(resCheckNoIos.status, 404, 'Update check for non-existent platform must return HTTP 404');
+  const dataCheckNoIos = await resCheckNoIos.json();
+  assert.strictEqual(dataCheckNoIos.code, 404);
+  assert(dataCheckNoIos.message.includes('ios'));
+
+  console.log('  ✅ Multi-platform matching, architecture filtering, latest package download, UA auto-detection, strict 404 not-found checks & short links verified.');
 }
 
 async function main() {

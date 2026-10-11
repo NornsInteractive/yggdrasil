@@ -3,7 +3,7 @@
 // ==============================================================================
 
 import { Hono } from 'hono';
-import { Env } from '../types';
+import { Env, VersionPackageEntity } from '../types';
 import { AppService } from '../services/appService';
 import { StorageService } from '../services/storageService';
 import { SettingService } from '../services/settingService';
@@ -11,6 +11,284 @@ import { SETTING_KEYS } from '../config/constants';
 import { tokenGuard } from '../middleware/tokenGuard';
 
 export const clientAppRoutes = new Hono<{ Bindings: Env }>();
+
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderPackageNotFoundHtml(options: {
+  appId: string;
+  appName?: string;
+  iconUrl?: string | null;
+  platform?: string;
+  arch?: string;
+  versionName?: string;
+  availablePackages: VersionPackageEntity[];
+  originUrl: string;
+}): string {
+  const { appId, appName, iconUrl, platform, arch, versionName, availablePackages, originUrl } = options;
+  const displayTitle = appName ? `${appName} (${appId})` : appId;
+  const targetDesc = [platform ? `平台: ${platform}` : '', arch ? `架构: ${arch}` : ''].filter(Boolean).join(' / ');
+
+  const packageRows = availablePackages.map(pkg => {
+    const dlUrl = `${originUrl}/api/v1/app/download?app_id=${encodeURIComponent(appId)}` +
+      (pkg.version_id ? `&version_id=${encodeURIComponent(pkg.version_id)}` : '') +
+      (pkg.id && !pkg.id.startsWith('pkg_def_') ? `&package_id=${encodeURIComponent(pkg.id)}` : '');
+    const sizeStr = pkg.file_size ? formatBytes(pkg.file_size) : '';
+
+    return `
+      <div class="pkg-card">
+        <div class="pkg-info">
+          <div class="pkg-header">
+            <span class="badge badge-platform">${escapeHtml(pkg.platform || 'universal')}</span>
+            <span class="badge badge-arch">${escapeHtml(pkg.arch || 'universal')}</span>
+          </div>
+          <div class="pkg-name">${escapeHtml(pkg.file_name || 'app-installer')}</div>
+          ${sizeStr ? `<div class="pkg-meta">文件大小: ${sizeStr}</div>` : ''}
+        </div>
+        <a href="${dlUrl}" class="btn-download">下载此安装包</a>
+      </div>
+    `;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>未找到对应安装包 - ${escapeHtml(displayTitle)}</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #131b2e;
+      --border: #1e293b;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --warn: #f59e0b;
+      --warn-bg: rgba(245, 158, 11, 0.1);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1.5rem;
+    }
+    .container {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2.5rem;
+      max-width: 620px;
+      width: 100%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    .app-header {
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .app-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 14px;
+      object-fit: cover;
+      background: #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      flex-shrink: 0;
+    }
+    .app-details h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.25rem;
+    }
+    .app-id {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+    .notice-box {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn);
+      border-radius: 12px;
+      padding: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .notice-title {
+      color: var(--warn);
+      font-weight: 600;
+      font-size: 1.05rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .notice-desc {
+      color: #cbd5e1;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .section-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .pkg-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.875rem;
+      margin-bottom: 2rem;
+    }
+    .pkg-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      transition: border-color 0.2s;
+    }
+    .pkg-card:hover {
+      border-color: #3b82f6;
+    }
+    .pkg-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .pkg-header {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
+    }
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-platform {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    .badge-arch {
+      background: rgba(168, 85, 247, 0.15);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+    }
+    .pkg-name {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #f1f5f9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 0.25rem;
+      font-family: monospace;
+    }
+    .pkg-meta {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .btn-download {
+      background: var(--primary);
+      color: #fff;
+      text-decoration: none;
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      white-space: nowrap;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .btn-download:hover {
+      background: var(--primary-hover);
+    }
+    .footer {
+      text-align: center;
+      margin-top: 1.5rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .footer a {
+      color: #60a5fa;
+      text-decoration: none;
+    }
+    .footer a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="app-header">
+      ${iconUrl ? `<img src="${escapeHtml(iconUrl)}" alt="${escapeHtml(displayTitle)}" class="app-icon" />` : `<div class="app-icon">📦</div>`}
+      <div class="app-details">
+        <h1>${escapeHtml(appName || appId)}</h1>
+        <div class="app-id">${escapeHtml(appId)}${versionName ? ` &bull; v${escapeHtml(versionName)}` : ''}</div>
+      </div>
+    </div>
+
+    <div class="notice-box">
+      <div class="notice-title">⚠️ 暂无适应该设备/平台的安装包</div>
+      <div class="notice-desc">
+        ${targetDesc ? `您的请求/设备环境被识别为 [<strong>${escapeHtml(targetDesc)}</strong>]，` : ''}该应用当前版本尚未提供此平台或架构的安装包。系统已阻止下载不兼容的安装包，以防运行崩溃。
+      </div>
+    </div>
+
+    ${availablePackages.length > 0 ? `
+    <div class="section-title">📦 该应用当前已发布的可用安装包</div>
+    <div class="pkg-list">
+      ${packageRows}
+    </div>
+    ` : `
+    <div style="color: var(--text-muted); font-size: 0.9rem; text-align: center; padding: 2rem 0;">
+      暂无任何已发布的安装包。
+    </div>
+    `}
+
+    <div class="footer">
+      Powered by <a href="/">Yggdrasil App Distribution</a>
+    </div>
+  </div>
+</body>
+</html>`;
+}
 
 function getPackageContentType(fileName: string): string {
   const lower = (fileName || '').toLowerCase();
@@ -123,9 +401,12 @@ const handleVersionCheck = async (c: any) => {
   );
 
   if (!checkResult) {
+    const targetDesc = [platform ? `平台: ${platform}` : '', arch ? `架构: ${arch}` : ''].filter(Boolean).join(' / ');
     return c.json({
       code: 404,
-      message: `App '${appId}' or published version not found for channel '${channel}'`,
+      message: targetDesc
+        ? `未找到适用于 [${targetDesc}] 的已发布版本或安装包 (App: ${appId}, Channel: ${channel})`
+        : `App '${appId}' or published version not found for channel '${channel}'`,
     }, 404);
   }
 
@@ -172,12 +453,81 @@ const handleAppDownload = async (c: any) => {
   }
 
   const version = await AppService.getVersionForDownload(c.env.DB, appId, versionCode, channel, platform, arch);
-  if (!version) {
-    return c.json({ code: 404, message: 'Requested App version not found or not published' }, 404);
-  }
+  const targetPkg = version
+    ? await AppService.getPackageForDownload(c.env.DB, version, platform, arch, packageId)
+    : null;
 
-  // 为当前版本匹配最佳安装包 (或精准定位指定 package_id)
-  const targetPkg = await AppService.getPackageForDownload(c.env.DB, version, platform, arch, packageId);
+  if (!version || !targetPkg) {
+    const originUrl = new URL(c.req.url).origin;
+    const isHtmlClient = (c.req.header('accept') || '').includes('text/html');
+    const appInfo = await AppService.getAppByAppId(c.env.DB, appId);
+    const fallbackVersion = version || await AppService.getLatestPublishedVersion(c.env.DB, appId, channel);
+
+    let availablePackages: VersionPackageEntity[] = [];
+    if (fallbackVersion) {
+      const pkgs = await AppService.listPackagesByVersionId(c.env.DB, fallbackVersion.id);
+      if (pkgs && pkgs.length > 0) {
+        availablePackages = pkgs;
+      } else {
+        availablePackages = [{
+          id: 'pkg_def_' + fallbackVersion.id,
+          version_id: fallbackVersion.id,
+          app_id: fallbackVersion.app_id,
+          platform: fallbackVersion.platform || 'android',
+          arch: fallbackVersion.arch || 'universal',
+          file_key: fallbackVersion.file_key || null,
+          file_name: fallbackVersion.file_name || 'app.apk',
+          file_size: fallbackVersion.file_size || 0,
+          file_md5: fallbackVersion.file_md5 || null,
+          file_sha256: fallbackVersion.file_sha256 || null,
+          external_url: fallbackVersion.external_url || null,
+          use_proxy: fallbackVersion.use_proxy || 0,
+          is_cleaned: fallbackVersion.is_cleaned || 0,
+          download_count: fallbackVersion.download_count || 0,
+          created_at: fallbackVersion.created_at,
+        }];
+      }
+    }
+
+    if (isHtmlClient) {
+      return c.html(renderPackageNotFoundHtml({
+        appId,
+        appName: appInfo?.name,
+        iconUrl: appInfo?.icon_url,
+        platform,
+        arch,
+        versionName: fallbackVersion?.version_name,
+        availablePackages,
+        originUrl,
+      }), 404);
+    }
+
+    const targetDesc = [platform ? `平台: ${platform}` : '', arch ? `架构: ${arch}` : ''].filter(Boolean).join(' / ');
+    return c.json({
+      code: 404,
+      message: targetDesc
+        ? `未找到适用于 [${targetDesc}] 的安装包 (App: ${appId})`
+        : `未找到应用 '${appId}' 的可用安装包`,
+      data: {
+        app_id: appId,
+        app_name: appInfo ? appInfo.name : appId,
+        requested_platform: platform || null,
+        requested_arch: arch || null,
+        version_name: fallbackVersion ? fallbackVersion.version_name : null,
+        version_code: fallbackVersion ? fallbackVersion.version_code : null,
+        available_packages: availablePackages.map(p => ({
+          id: p.id,
+          platform: p.platform,
+          arch: p.arch,
+          file_name: p.file_name,
+          file_size: p.file_size,
+          download_url: `${originUrl}/api/v1/app/download?app_id=${encodeURIComponent(appId)}` +
+            (fallbackVersion ? `&version_code=${fallbackVersion.version_code}` : '') +
+            (p.id && !p.id.startsWith('pkg_def_') ? `&package_id=${encodeURIComponent(p.id)}` : '')
+        }))
+      }
+    }, 404);
+  }
 
   // 异步增加主版本与具体安装包下载次数 (不阻塞下载响应)
   try {
