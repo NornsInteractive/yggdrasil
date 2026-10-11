@@ -24,6 +24,7 @@
   - 支持细粒度开关：可单独设置“版本检测”或“文件下载”是否需要 Token。
   - 兼容 Header（`X-Ygg-Token` / `Bearer`）和 URL Query（`?token=`）传参。
 - 💻 **现代化 Web 管理控制台**：内置单页应用，直观管理应用、发布版本、上传文件、设置 Token，并提供**可视化接口模拟测试台**。
+- 🤖 **原生 Model Context Protocol (MCP) 支持**：提供全套 12 个 MCP Tools，兼容 Cursor、Claude Desktop、Antigravity CLI、Windsurf、Cline 等 AI 客户端，支持本地 STDIO 与边缘 HTTP JSON-RPC 2.0 远程调用，详见 [MCP 接入指南](MCP.md)。
 
 ---
 

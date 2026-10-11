@@ -12,6 +12,7 @@ import { adminAppsRoutes } from './routes/adminApps';
 import { adminFilesRoutes } from './routes/adminFiles';
 import { adminUploadRoutes } from './routes/adminUpload';
 import { adminSettingsRoutes } from './routes/adminSettings';
+import { mcpRoutes } from './routes/mcp';
 import { CleanupService } from './services/cleanupService';
 import { renderDashboardHtml } from './views/dashboard';
 
@@ -27,7 +28,8 @@ app.use('/api/*', async (c, next) => {
     c.req.path === '/api/admin/login' || 
     c.req.path === '/api/admin/logout' || 
     c.req.path === '/api/admin/me' ||
-    c.req.path === '/health'
+    c.req.path === '/health' ||
+    (c.req.method === 'GET' && (c.req.path === '/api/mcp' || c.req.path === '/api/mcp/tools'))
   ) {
     return await next();
   }
@@ -71,6 +73,7 @@ app.route('/', adminAppsRoutes);
 app.route('/', adminFilesRoutes);
 app.route('/', adminUploadRoutes);
 app.route('/', adminSettingsRoutes);
+app.route('/', mcpRoutes);
 
 // 5. 健康检查接口
 app.get('/health', (c) => {

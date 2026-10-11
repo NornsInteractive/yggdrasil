@@ -4,11 +4,15 @@
   "type": "module",
   "description": "Cloudflare-native App release management and file distribution system (ygg)",
   "main": "dist/worker.js",
+  "bin": {
+    "yggdrasil-mcp": "./dist/mcp-server.js"
+  },
   "scripts": {
     "dev": "wrangler dev",
     "build": "node build.js",
     "deploy": "wrangler deploy",
-    "test": "node test/verify.js"
+    "test": "node test/verify.js",
+    "mcp": "node dist/mcp-server.js"
   },
   "keywords": [
     "cloudflare",
@@ -17,11 +21,14 @@
     "d1",
     "app-distribution",
     "apk-release",
-    "resumable-download"
+    "resumable-download",
+    "model-context-protocol",
+    "mcp"
   ],
   "author": "dev",
   "license": "MIT",
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "hono": "^4.7.2"
   },
   "devDependencies": {

@@ -1167,6 +1167,33 @@ val downloadReq = Request.Builder()
     .addHeader("Range", "bytes=\${existingFile.length()}-")
     .build()</div>
         </div>
+
+        <!-- 接口 4: MCP AI 助手接入 -->
+        <div class="stat-card" style="margin-top: 1.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; font-weight: 700;">MCP</span>
+              <span class="mono" style="font-size: 1rem; font-weight: 700;">/api/mcp</span>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="copyText(window.location.origin + '/api/mcp', 'MCP URL 已复制')">复制 MCP URL</button>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem;">
+            原生支持 <b>Model Context Protocol (MCP)</b> 协议。Cursor、Claude Desktop、Antigravity CLI、Windsurf 等 AI 助手可直接连接并调用 12 项管理工具。
+          </p>
+          <div class="code-box"># Cursor / Claude Desktop 配置模版 (claude_desktop_config.json / mcp.json):
+{
+  "mcpServers": {
+    "yggdrasil": {
+      "command": "node",
+      "args": ["dist/mcp-server.js"],
+      "env": {
+        "YGG_ENDPOINT": "https://your-worker.workers.dev",
+        "YGG_TOKEN": "your_token_here"
+      }
+    }
+  }
+}</div>
+        </div>
       </section>
     </main>
   </div>

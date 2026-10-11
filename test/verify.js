@@ -288,11 +288,221 @@ async function testExternalUrlAndCleanedFlow() {
   console.log('  ✅ External URL 302 redirect, Cleaned package 410, and Loop Prevention 400 verified successfully.');
 }
 
+console.log('▶ Test 10: Verifying MCP (Model Context Protocol) Endpoints, Tools, and STDIO CLI');
+async function testMcpFlow() {
+  const { default: app } = await import('../dist/worker.js');
+  const { spawn } = await import('node:child_process');
+
+  assert(existsSync('dist/mcp-server.js'), 'dist/mcp-server.js must exist after build');
+  const mcpCliContent = readFileSync('dist/mcp-server.js', 'utf-8');
+  assert(mcpCliContent.startsWith('#!/usr/bin/env node'), 'dist/mcp-server.js must have node shebang');
+
+  // 1. GET /api/mcp overview
+  const resOverview = await app.fetch(new Request('http://localhost/api/mcp'), {});
+  assert.strictEqual(resOverview.status, 200, 'GET /api/mcp should return HTTP 200');
+  const overviewData = await resOverview.json();
+  assert.strictEqual(overviewData.tools_count, 12, 'Overview must advertise 12 tools');
+  assert(overviewData.usage.desktop_config_example, 'Overview must provide desktop config example');
+
+  // 2. GET /api/mcp/tools
+  const resTools = await app.fetch(new Request('http://localhost/api/mcp/tools'), {});
+  assert.strictEqual(resTools.status, 200, 'GET /api/mcp/tools should return HTTP 200');
+  const toolsData = await resTools.json();
+  assert.strictEqual(toolsData.data.total_tools, 12, 'GET /api/mcp/tools should list all 12 tools');
+
+  // 3. Mock DB for MCP execution
+  const createMcpMockDb = () => ({
+    prepare: (sql) => ({
+      bind: (...args) => ({
+        first: async () => ({
+          total_apps: 2,
+          total_versions: 5,
+          app_storage_bytes: 10485760,
+          app_downloads: 120,
+          total_files: 3,
+          file_storage_bytes: 2097152,
+          file_downloads: 40,
+          value: 'false',
+        }),
+        all: async () => ({
+          results: [
+            {
+              app_id: 'com.test.app',
+              name: 'Test App',
+              created_at: new Date().toISOString(),
+              version_count: 3,
+              total_downloads: 50,
+              latest_version_code: 102,
+              latest_version_name: '1.0.2',
+            },
+          ],
+        }),
+        run: async () => ({ success: true }),
+      }),
+      all: async () => ({
+        results: [
+          {
+            app_id: 'com.test.app',
+            name: 'Test App',
+            created_at: new Date().toISOString(),
+            version_count: 3,
+            total_downloads: 50,
+            latest_version_code: 102,
+            latest_version_name: '1.0.2',
+          },
+        ],
+      }),
+      first: async () => ({
+        total_apps: 2,
+        total_versions: 5,
+        app_storage_bytes: 10485760,
+        app_downloads: 120,
+        total_files: 3,
+        file_storage_bytes: 2097152,
+        file_downloads: 40,
+        value: 'false',
+      }),
+      run: async () => ({ success: true }),
+    }),
+  });
+
+  const mockDb = createMcpMockDb();
+
+  // 4. POST /api/mcp JSON-RPC initialize
+  const resInit = await app.fetch(
+    new Request('http://localhost/api/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { protocolVersion: '2024-11-05', capabilities: {} },
+      }),
+    }),
+    { DB: mockDb }
+  );
+  assert.strictEqual(resInit.status, 200, 'POST /api/mcp initialize should return 200');
+  const initResult = await resInit.json();
+  assert.strictEqual(initResult.result.serverInfo.name, 'yggdrasil');
+
+  // 5. POST /api/mcp JSON-RPC tools/list
+  const resList = await app.fetch(
+    new Request('http://localhost/api/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/list',
+      }),
+    }),
+    { DB: mockDb }
+  );
+  assert.strictEqual(resList.status, 200);
+  const listResult = await resList.json();
+  assert.strictEqual(listResult.result.tools.length, 12, 'tools/list should return 12 tools');
+
+  // 6. POST /api/mcp JSON-RPC tools/call: ygg_list_apps
+  const resCallApps = await app.fetch(
+    new Request('http://localhost/api/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 3,
+        method: 'tools/call',
+        params: {
+          name: 'ygg_list_apps',
+          arguments: {},
+        },
+      }),
+    }),
+    { DB: mockDb }
+  );
+  assert.strictEqual(resCallApps.status, 200);
+  const callAppsResult = await resCallApps.json();
+  assert(callAppsResult.result.content[0].text.includes('com.test.app'), 'Tool output should include app data');
+
+  // 7. POST /api/mcp JSON-RPC tools/call: ygg_get_system_stats
+  const resCallStats = await app.fetch(
+    new Request('http://localhost/api/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 4,
+        method: 'tools/call',
+        params: {
+          name: 'ygg_get_system_stats',
+          arguments: {},
+        },
+      }),
+    }),
+    { DB: mockDb }
+  );
+  assert.strictEqual(resCallStats.status, 200);
+  const callStatsResult = await resCallStats.json();
+  assert(callStatsResult.result.content[0].text.includes('total_apps'), 'Tool output should include total_apps');
+
+  // 8. STDIO Server child process test
+  await new Promise((resolve, reject) => {
+    const child = spawn('node', ['dist/mcp-server.js'], {
+      env: { ...process.env, YGG_ENDPOINT: 'http://localhost' },
+    });
+
+    let buffer = '';
+    const timeout = setTimeout(() => {
+      child.kill();
+      reject(new Error('STDIO server test timed out'));
+    }, 5000);
+
+    child.stdout.on('data', (chunk) => {
+      buffer += chunk.toString();
+      const lines = buffer.split('\n');
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const msg = JSON.parse(line);
+          if (msg.id === 10) {
+            clearTimeout(timeout);
+            assert.strictEqual(msg.result.tools.length, 12, 'STDIO server must return 12 tools');
+            child.kill();
+            resolve();
+            return;
+          }
+        } catch (e) {}
+      }
+    });
+
+    child.stdin.write(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 9,
+        method: 'initialize',
+        params: { protocolVersion: '2024-11-05', capabilities: {} },
+      }) + '\n'
+    );
+
+    child.stdin.write(
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 10,
+        method: 'tools/list',
+        params: {},
+      }) + '\n'
+    );
+  });
+
+  console.log('  ✅ MCP HTTP JSON-RPC 2.0 endpoints, tool execution, and STDIO server verified successfully.');
+}
+
 async function main() {
   await testJwt();
   await testAppRouting();
   testCleanupLogic();
   await testExternalUrlAndCleanedFlow();
+  await testMcpFlow();
   console.log('\n🎉 ALL SYSTEM TESTS PASSED SUCCESSFULLY! 🚀\n');
 }
 
