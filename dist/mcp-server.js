@@ -16963,13 +16963,21 @@ var YGG_MCP_TOOLS = [
   },
   {
     name: "ygg_get_app_details",
-    description: "\u83B7\u53D6\u6307\u5B9A\u5E94\u7528\uFF08\u901A\u8FC7 app_id / \u5305\u540D\uFF09\u7684\u8BE6\u7EC6\u914D\u7F6E\u4E0E\u6240\u6709\u5386\u53F2\u7248\u672C\u53D1\u5E03\u5217\u8868\uFF08\u5305\u62EC\u7248\u672C\u53F7\u3001\u6E20\u9053\u3001\u66F4\u65B0\u65E5\u5FD7\u3001\u76F4\u94FE\u3001\u53CD\u4EE3\u8BBE\u7F6E\u53CA\u6587\u4EF6\u5927\u5C0F\uFF09\u3002",
+    description: "\u83B7\u53D6\u6307\u5B9A\u5E94\u7528\uFF08\u901A\u8FC7 app_id / \u5305\u540D\uFF09\u7684\u8BE6\u7EC6\u914D\u7F6E\u4E0E\u6240\u6709\u5386\u53F2\u7248\u672C\u53D1\u5E03\u5217\u8868\u3002\u53EF\u4F20\u5165 platform \u53CA arch \u83B7\u53D6\u9488\u5BF9\u8BE5\u5E73\u53F0\u4E0E\u67B6\u6784\u7684\u6700\u65B0\u4E13\u5C5E\u4E0B\u8F7D\u76F4\u94FE\u3001\u77ED\u94FE\u53CA\u5404\u7248\u672C\u5206\u53D1\u5305\u6E05\u5355\uFF08packages\uFF09\u3002",
     inputSchema: {
       type: "object",
       properties: {
         app_id: {
           type: "string",
           description: "\u5E94\u7528\u7684\u552F\u4E00\u5305\u540D (\u5982 com.norns.valhalla)"
+        },
+        platform: {
+          type: "string",
+          description: "\u53EF\u9009\u7684\u76EE\u6807\u64CD\u4F5C\u7CFB\u7EDF\u5E73\u53F0 (\u5982 windows, android, macos, linux, ios, universal)\uFF0C\u7528\u4E8E\u83B7\u53D6\u4E13\u5C5E\u6700\u65B0\u4E0B\u8F7D\u94FE\u63A5"
+        },
+        arch: {
+          type: "string",
+          description: "\u53EF\u9009\u7684\u76EE\u6807 CPU \u67B6\u6784 (\u5982 x86_64, arm64-v8a, armeabi-v7a, apple-silicon, universal)"
         }
       },
       required: ["app_id"]

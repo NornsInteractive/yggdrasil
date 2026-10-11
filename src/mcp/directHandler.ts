@@ -36,6 +36,8 @@ export async function executeMcpTool(
           total_downloads: a.total_downloads || 0,
           latest_version_code: a.latest_version_code || null,
           latest_version_name: a.latest_version_name || null,
+          latest_download_url: `${originUrl}/api/v1/app/download?app_id=${encodeURIComponent(a.app_id)}`,
+          short_download_url: `${originUrl}/d/${encodeURIComponent(a.app_id)}`,
           created_at: a.created_at,
           updated_at: a.updated_at,
         })),
@@ -49,10 +51,24 @@ export async function executeMcpTool(
       const app = await AppService.getAppByAppId(db, appId);
       if (!app) throw new Error(`App not found: ${appId}`);
 
-      const versions = await AppService.listVersions(db, appId);
+      const platform = args.platform ? String(args.platform).trim().toLowerCase() : undefined;
+      const arch = args.arch ? String(args.arch).trim().toLowerCase() : undefined;
+
+      const versions = await AppService.listVersions(db, appId, originUrl);
+
+      let platQuery = '';
+      if (platform) platQuery += `&platform=${encodeURIComponent(platform)}`;
+      if (arch) platQuery += `&arch=${encodeURIComponent(arch)}`;
+
+      let shortPlatQuery = '';
+      if (platform) shortPlatQuery += `platform=${encodeURIComponent(platform)}`;
+      if (arch) shortPlatQuery += (shortPlatQuery ? '&' : '') + `arch=${encodeURIComponent(arch)}`;
+
       return {
         app,
         total_versions: versions.length,
+        latest_download_url: `${originUrl}/api/v1/app/download?app_id=${encodeURIComponent(app.app_id)}${platQuery}`,
+        short_download_url: `${originUrl}/d/${encodeURIComponent(app.app_id)}${shortPlatQuery ? '?' + shortPlatQuery : ''}`,
         versions: versions.map((v) => ({
           id: v.id,
           app_id: v.app_id,
@@ -61,6 +77,8 @@ export async function executeMcpTool(
           min_version_code: v.min_version_code,
           channel: v.channel,
           changelog: v.changelog,
+          platform: v.platform,
+          arch: v.arch,
           external_url: v.external_url || null,
           use_proxy: Boolean(v.use_proxy),
           is_cleaned: Boolean(v.is_cleaned),
@@ -70,7 +88,8 @@ export async function executeMcpTool(
           file_name: v.file_name,
           file_size: v.file_size,
           created_at: v.created_at,
-          download_url: `${originUrl}/api/v1/app/download?app_id=${encodeURIComponent(v.app_id)}&version_code=${v.version_code}&channel=${encodeURIComponent(v.channel)}`,
+          download_url: `${originUrl}/api/v1/app/download?app_id=${encodeURIComponent(v.app_id)}&version_code=${v.version_code}&channel=${encodeURIComponent(v.channel)}${platQuery}`,
+          packages: v.packages || [],
         })),
       };
     }
@@ -81,8 +100,8 @@ export async function executeMcpTool(
 
       const currentVersionCode = Number(args.current_version_code) || 0;
       const channel = args.channel ? String(args.channel).trim() : 'default';
-      const platform = args.platform ? String(args.platform).trim() : undefined;
-      const arch = args.arch ? String(args.arch).trim() : undefined;
+      const platform = args.platform ? String(args.platform).trim().toLowerCase() : undefined;
+      const arch = args.arch ? String(args.arch).trim().toLowerCase() : undefined;
 
       const updateData = await AppService.checkAppUpdate(
         db,
@@ -100,7 +119,10 @@ export async function executeMcpTool(
           message: `No published version found for app '${appId}' in channel '${channel}'`,
         };
       }
-      return updateData;
+      return {
+        ...updateData,
+        short_download_url: `${originUrl}/d/${encodeURIComponent(appId)}${platform ? `?platform=${encodeURIComponent(platform)}` + (arch ? `&arch=${encodeURIComponent(arch)}` : '') : ''}`,
+      };
     }
 
     case 'ygg_create_app': {
@@ -203,10 +225,20 @@ export async function executeMcpTool(
       if (platform) dlUrl += `&platform=${encodeURIComponent(platform)}`;
       if (arch) dlUrl += `&arch=${encodeURIComponent(arch)}`;
 
+      let platQuery = '';
+      if (platform) platQuery += `&platform=${encodeURIComponent(platform)}`;
+      if (arch) platQuery += `&arch=${encodeURIComponent(arch)}`;
+
+      let shortPlatQuery = '';
+      if (platform) shortPlatQuery += `platform=${encodeURIComponent(platform)}`;
+      if (arch) shortPlatQuery += (shortPlatQuery ? '&' : '') + `arch=${encodeURIComponent(arch)}`;
+
       return {
         message: 'Version published successfully',
         version: newVersion,
         download_url: dlUrl,
+        latest_download_url: `${originUrl}/api/v1/app/download?app_id=${encodeURIComponent(newVersion.app_id)}${platQuery}`,
+        short_download_url: `${originUrl}/d/${encodeURIComponent(newVersion.app_id)}${shortPlatQuery ? '?' + shortPlatQuery : ''}`,
       };
     }
 

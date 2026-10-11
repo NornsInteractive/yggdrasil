@@ -28,13 +28,21 @@ export const YGG_MCP_TOOLS: McpToolDefinition[] = [
   },
   {
     name: 'ygg_get_app_details',
-    description: '获取指定应用（通过 app_id / 包名）的详细配置与所有历史版本发布列表（包括版本号、渠道、更新日志、直链、反代设置及文件大小）。',
+    description: '获取指定应用（通过 app_id / 包名）的详细配置与所有历史版本发布列表。可传入 platform 及 arch 获取针对该平台与架构的最新专属下载直链、短链及各版本分发包清单（packages）。',
     inputSchema: {
       type: 'object',
       properties: {
         app_id: {
           type: 'string',
           description: '应用的唯一包名 (如 com.norns.valhalla)'
+        },
+        platform: {
+          type: 'string',
+          description: '可选的目标操作系统平台 (如 windows, android, macos, linux, ios, universal)，用于获取专属最新下载链接'
+        },
+        arch: {
+          type: 'string',
+          description: '可选的目标 CPU 架构 (如 x86_64, arm64-v8a, armeabi-v7a, apple-silicon, universal)'
         }
       },
       required: ['app_id']
