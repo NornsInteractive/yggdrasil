@@ -34,6 +34,32 @@ CREATE TABLE IF NOT EXISTS app_versions (
 CREATE INDEX IF NOT EXISTS idx_app_versions_lookup 
 ON app_versions(app_id, channel, is_published, version_code DESC);
 
+CREATE TABLE IF NOT EXISTS version_packages (
+    id TEXT PRIMARY KEY,
+    version_id TEXT NOT NULL,
+    app_id TEXT NOT NULL,
+    platform TEXT NOT NULL DEFAULT 'android',
+    arch TEXT NOT NULL DEFAULT 'universal',
+    file_key TEXT,
+    file_name TEXT NOT NULL,
+    file_size INTEGER NOT NULL DEFAULT 0,
+    file_md5 TEXT,
+    file_sha256 TEXT,
+    external_url TEXT,
+    use_proxy INTEGER DEFAULT 0,
+    is_cleaned INTEGER DEFAULT 0,
+    download_count INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(version_id) REFERENCES app_versions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_version_packages_lookup 
+ON version_packages(version_id, platform, arch);
+
+CREATE INDEX IF NOT EXISTS idx_version_packages_app 
+ON version_packages(app_id, platform, arch);
+
 CREATE TABLE IF NOT EXISTS files (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,

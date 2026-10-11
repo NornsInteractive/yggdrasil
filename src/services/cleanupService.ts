@@ -101,7 +101,7 @@ export class CleanupService {
           // 跳过需要保留的最新版本
           if (keepSet.has(ver.id)) continue;
 
-          // 4. 从 R2 存储桶彻底删除 APK 文件
+          // 4. 从 R2 存储桶彻底删除 APK 文件 (包括版本主文件及所有平台分发包文件)
           if (ver.file_key) {
             try {
               await StorageService.deleteObject(bucket, ver.file_key);
@@ -109,6 +109,25 @@ export class CleanupService {
               console.warn(`[CleanupService] Failed to delete R2 object ${ver.file_key}:`, e);
             }
           }
+
+          try {
+            const { results: pkgs } = await db.prepare(
+              'SELECT id, file_key, file_size FROM version_packages WHERE version_id = ? AND (is_cleaned = 0 OR is_cleaned IS NULL) AND (file_key IS NOT NULL AND file_key != "")'
+            ).bind(ver.id).all<{ id: string; file_key: string; file_size: number }>();
+            if (pkgs && pkgs.length > 0) {
+              for (const p of pkgs) {
+                if (p.file_key && p.file_key !== ver.file_key) {
+                  try {
+                    await StorageService.deleteObject(bucket, p.file_key);
+                    result.freedBytes += p.file_size || 0;
+                  } catch (e) {
+                    console.warn(`[CleanupService] Failed to delete package R2 object ${p.file_key}:`, e);
+                  }
+                }
+              }
+            }
+            await db.prepare('UPDATE version_packages SET is_cleaned = 1, file_key = "" WHERE version_id = ?').bind(ver.id).run();
+          } catch (e) {}
 
           // 5. 更新 D1 数据库记录：标记安装包已被清理，清空 file_key，但完整保留版本信息、发布日志与下载统计
           await db.prepare(

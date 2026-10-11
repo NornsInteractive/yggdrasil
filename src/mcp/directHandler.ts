@@ -81,13 +81,17 @@ export async function executeMcpTool(
 
       const currentVersionCode = Number(args.current_version_code) || 0;
       const channel = args.channel ? String(args.channel).trim() : 'default';
+      const platform = args.platform ? String(args.platform).trim() : undefined;
+      const arch = args.arch ? String(args.arch).trim() : undefined;
 
       const updateData = await AppService.checkAppUpdate(
         db,
         appId,
         currentVersionCode,
         channel,
-        originUrl
+        originUrl,
+        platform,
+        arch
       );
 
       if (!updateData) {
@@ -175,6 +179,9 @@ export async function executeMcpTool(
         }
       }
 
+      const platform = args.platform ? String(args.platform).trim() : undefined;
+      const arch = args.arch ? String(args.arch).trim() : undefined;
+
       const newVersion = await AppService.createVersion(db, {
         app_id: appId,
         version_code: versionCode,
@@ -187,13 +194,19 @@ export async function executeMcpTool(
         is_force_update: args.is_force_update ? 1 : 0,
         file_name: args.file_name ? String(args.file_name).trim() : undefined,
         file_size: args.file_size ? Number(args.file_size) : 0,
+        platform,
+        arch,
         is_published: 1,
       });
+
+      let dlUrl = `${originUrl}/api/v1/app/download?app_id=${encodeURIComponent(newVersion.app_id)}&version_code=${newVersion.version_code}&channel=${encodeURIComponent(newVersion.channel)}`;
+      if (platform) dlUrl += `&platform=${encodeURIComponent(platform)}`;
+      if (arch) dlUrl += `&arch=${encodeURIComponent(arch)}`;
 
       return {
         message: 'Version published successfully',
         version: newVersion,
-        download_url: `${originUrl}/api/v1/app/download?app_id=${encodeURIComponent(newVersion.app_id)}&version_code=${newVersion.version_code}&channel=${encodeURIComponent(newVersion.channel)}`,
+        download_url: dlUrl,
       };
     }
 
@@ -306,6 +319,58 @@ export async function executeMcpTool(
             ? `${originUrl}/f/${f.alias}`
             : `${originUrl}/api/v1/files/download/${f.id}`,
         })),
+      };
+    }
+
+    case 'ygg_add_version_package': {
+      const versionId = args.version_id ? String(args.version_id).trim() : '';
+      const platform = args.platform ? String(args.platform).trim().toLowerCase() : '';
+      const arch = args.arch ? String(args.arch).trim().toLowerCase() : '';
+      if (!versionId || !platform || !arch) {
+        throw new Error('Missing required arguments: version_id, platform, arch');
+      }
+
+      const version = await AppService.getVersionById(db, versionId);
+      if (!version) throw new Error(`Version not found: ${versionId}`);
+
+      if (args.external_url && String(args.external_url).trim()) {
+        const ext = String(args.external_url).trim();
+        if (!ext.startsWith('http://') && !ext.startsWith('https://')) {
+          throw new Error('external_url must start with http:// or https://');
+        }
+        if (ext.includes('/api/v1/app/download')) {
+          throw new Error('external_url cannot point to the gateway download endpoint');
+        }
+      }
+
+      const pkg = await AppService.createPackage(db, {
+        version_id: versionId,
+        app_id: version.app_id,
+        platform,
+        arch,
+        file_key: args.file_key ? String(args.file_key).trim() : undefined,
+        file_name: args.file_name ? String(args.file_name).trim() : undefined,
+        file_size: args.file_size ? Number(args.file_size) : 0,
+        file_md5: args.file_md5 ? String(args.file_md5).trim() : undefined,
+        file_sha256: args.file_sha256 ? String(args.file_sha256).trim() : undefined,
+        external_url: args.external_url ? String(args.external_url).trim() : undefined,
+        use_proxy: args.use_proxy ? 1 : 0,
+      });
+
+      return {
+        message: 'Package added successfully',
+        package: pkg,
+        download_url: `${originUrl}/api/v1/app/download?app_id=${encodeURIComponent(version.app_id)}&version_code=${version.version_code}&channel=${encodeURIComponent(version.channel)}&package_id=${pkg.id}`,
+      };
+    }
+
+    case 'ygg_delete_version_package': {
+      const packageId = args.package_id ? String(args.package_id).trim() : '';
+      if (!packageId) throw new Error('Missing required argument: package_id');
+
+      await AppService.deletePackage(db, bucket, packageId);
+      return {
+        message: `Package '${packageId}' deleted successfully`,
       };
     }
 

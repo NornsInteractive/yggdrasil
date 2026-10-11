@@ -41,6 +41,33 @@ CREATE TABLE IF NOT EXISTS app_versions (
 CREATE INDEX IF NOT EXISTS idx_app_versions_lookup 
 ON app_versions(app_id, channel, is_published, version_code DESC);
 
+-- 2.1 版本分发包表 (支持多平台与多架构独立安装包配置)
+CREATE TABLE IF NOT EXISTS version_packages (
+    id TEXT PRIMARY KEY,                   -- 安装包唯一ID (如 pkg_xxx)
+    version_id TEXT NOT NULL,              -- 关联的版本ID (app_versions.id)
+    app_id TEXT NOT NULL,                  -- 应用包名 (apps.app_id)
+    platform TEXT NOT NULL DEFAULT 'android', -- 平台 (android / windows / macos / linux / ios / universal)
+    arch TEXT NOT NULL DEFAULT 'universal',   -- 架构 (universal / arm64-v8a / armeabi-v7a / x86_64 / x86 / apple-silicon)
+    file_key TEXT,                         -- R2 存储 Key (免上传直链时可为空)
+    file_name TEXT NOT NULL,               -- 文件名 (如 app-windows-x64.zip)
+    file_size INTEGER NOT NULL DEFAULT 0,  -- 文件字节大小
+    file_md5 TEXT,                         -- 文件 MD5
+    file_sha256 TEXT,                      -- 文件 SHA256
+    external_url TEXT,                     -- 第三方下载直链 (免上传 R2)
+    use_proxy INTEGER DEFAULT 0,           -- 是否反代加速 (0: 302跳转, 1: Worker反代)
+    is_cleaned INTEGER DEFAULT 0,          -- 安装包是否已被清理 (0: 否, 1: 是)
+    download_count INTEGER DEFAULT 0,      -- 该安装包下载计数
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(version_id) REFERENCES app_versions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_version_packages_lookup 
+ON version_packages(version_id, platform, arch);
+
+CREATE INDEX IF NOT EXISTS idx_version_packages_app 
+ON version_packages(app_id, platform, arch);
+
 -- 3. 通用文件表 (支持任意非 APK 文件的存储、分类与短链别名分发)
 CREATE TABLE IF NOT EXISTS files (
     id TEXT PRIMARY KEY,                   -- 文件记录唯一ID

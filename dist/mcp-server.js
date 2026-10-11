@@ -16977,7 +16977,7 @@ var YGG_MCP_TOOLS = [
   },
   {
     name: "ygg_check_update",
-    description: "\u5BA2\u6237\u7AEF\u68C0\u6D4B\u66F4\u65B0\u6A21\u62DF\uFF1A\u4F20\u5165\u5E94\u7528 app_id\u3001\u5BA2\u6237\u7AEF\u5F53\u524D\u7248\u672C\u53F7 version_code\u3001\u4EE5\u53CA\u53D1\u5E03\u6E20\u9053 channel\uFF0C\u68C0\u6D4B\u662F\u5426\u6709\u65B0\u7248\u672C\u53EF\u4F9B\u5347\u7EA7\uFF0C\u5E76\u8FD4\u56DE\u4E0B\u8F7D\u76F4\u94FE\u4E0E\u66F4\u65B0\u65E5\u5FD7\u3002",
+    description: "\u5BA2\u6237\u7AEF\u68C0\u6D4B\u66F4\u65B0\u6A21\u62DF\uFF1A\u4F20\u5165\u5E94\u7528 app_id\u3001\u5BA2\u6237\u7AEF\u5F53\u524D\u7248\u672C\u53F7 version_code\u3001\u53D1\u5E03\u6E20\u9053 channel\u3001\u76EE\u6807\u5E73\u53F0 platform \u53CA\u67B6\u6784 arch\uFF0C\u68C0\u6D4B\u662F\u5426\u6709\u65B0\u7248\u672C\u53EF\u4F9B\u5347\u7EA7\uFF0C\u5E76\u8FD4\u56DE\u6700\u9002\u5408\u5F53\u524D\u7CFB\u7EDF\u7684\u4E0B\u8F7D\u76F4\u94FE\u4E0E\u5168\u5E73\u53F0\u5B89\u88C5\u5305\u5217\u8868\u3002",
     inputSchema: {
       type: "object",
       properties: {
@@ -16992,6 +16992,14 @@ var YGG_MCP_TOOLS = [
         channel: {
           type: "string",
           description: "\u53D1\u5E03\u6E20\u9053 (\u5982 default, beta, googleplay\uFF0C\u9ED8\u8BA4\u4E3A default)"
+        },
+        platform: {
+          type: "string",
+          description: "\u5BA2\u6237\u7AEF\u64CD\u4F5C\u7CFB\u7EDF\u5E73\u53F0 (\u5982 android, windows, macos, linux, ios\uFF0C\u9ED8\u8BA4\u4E3A universal/android)"
+        },
+        arch: {
+          type: "string",
+          description: "\u5BA2\u6237\u7AEF CPU \u67B6\u6784 (\u5982 universal, arm64-v8a, x86_64, apple-silicon)"
         }
       },
       required: ["app_id"]
@@ -17112,6 +17120,14 @@ var YGG_MCP_TOOLS = [
         file_size: {
           type: "number",
           description: "\u6587\u4EF6\u5927\u5C0F (\u5B57\u8282\u6570)"
+        },
+        platform: {
+          type: "string",
+          description: "\u4E3B\u5305\u5E73\u53F0\u6807\u8BC6 (\u5982 android, windows, macos, linux, ios\uFF0C\u9ED8\u8BA4\u4E3A android)"
+        },
+        arch: {
+          type: "string",
+          description: "\u4E3B\u5305 CPU \u67B6\u6784 (\u5982 universal, arm64-v8a, x86_64\uFF0C\u9ED8\u8BA4\u4E3A universal)"
         }
       },
       required: ["app_id", "version_code", "version_name"]
@@ -17221,6 +17237,70 @@ var YGG_MCP_TOOLS = [
           description: "\u6587\u4EF6\u5206\u7C7B\u8FC7\u6EE4 (\u5982 general, config, apk)"
         }
       }
+    }
+  },
+  {
+    name: "ygg_add_version_package",
+    description: "\u4E3A\u6307\u5B9A\u5E94\u7528\u7248\u672C\u9644\u52A0\u65B0\u7684\u591A\u5E73\u53F0\u6216\u591A\u67B6\u6784\u5206\u53D1\u5B89\u88C5\u5305\uFF08\u5982 Windows x86_64\u3001Android arm64-v8a\u3001macOS Apple Silicon \u7B49\uFF09\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        version_id: {
+          type: "string",
+          description: "\u6240\u5C5E\u7248\u672C\u7684\u552F\u4E00 ID (\u5982 ver_xxx)"
+        },
+        platform: {
+          type: "string",
+          description: "\u76EE\u6807\u64CD\u4F5C\u7CFB\u7EDF\u5E73\u53F0 (android, windows, macos, linux, ios, universal)"
+        },
+        arch: {
+          type: "string",
+          description: "\u76EE\u6807 CPU \u67B6\u6784 (universal, arm64-v8a, armeabi-v7a, x86_64, x86, apple-silicon)"
+        },
+        external_url: {
+          type: "string",
+          description: "\u7B2C\u4E09\u65B9\u5B89\u88C5\u5305\u4E0B\u8F7D\u76F4\u94FE (\u514D\u4E0A\u4F20)"
+        },
+        use_proxy: {
+          type: "boolean",
+          description: "\u662F\u5426\u5F00\u542F\u8FB9\u7F18\u53CD\u5411\u4EE3\u7406\u6D41\u5F0F\u52A0\u901F"
+        },
+        file_key: {
+          type: "string",
+          description: "\u5DF2\u4E0A\u4F20\u81F3 R2 \u7684\u5B58\u50A8 Key"
+        },
+        file_name: {
+          type: "string",
+          description: "\u4E0B\u8F7D\u65F6\u4FDD\u5B58\u7684\u6587\u4EF6\u540D"
+        },
+        file_size: {
+          type: "number",
+          description: "\u6587\u4EF6\u5927\u5C0F (\u5B57\u8282\u6570)"
+        },
+        file_md5: {
+          type: "string",
+          description: "MD5 \u6821\u9A8C\u548C"
+        },
+        file_sha256: {
+          type: "string",
+          description: "SHA256 \u6821\u9A8C\u548C"
+        }
+      },
+      required: ["version_id", "platform", "arch"]
+    }
+  },
+  {
+    name: "ygg_delete_version_package",
+    description: "\u5220\u9664\u6307\u5B9A\u5E94\u7528\u7248\u672C\u540D\u4E0B\u7684\u67D0\u4E2A\u5206\u53D1\u5B89\u88C5\u5305\u5E76\u7269\u7406\u5220\u9664\u5BF9\u5E94 R2 \u5B58\u50A8\u3002",
+    inputSchema: {
+      type: "object",
+      properties: {
+        package_id: {
+          type: "string",
+          description: "\u9700\u8981\u5220\u9664\u7684\u5206\u53D1\u5B89\u88C5\u5305\u552F\u4E00 ID (\u5982 pkg_xxx)"
+        }
+      },
+      required: ["package_id"]
     }
   }
 ];

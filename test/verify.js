@@ -25,6 +25,8 @@ assert(schema.includes('CREATE TABLE IF NOT EXISTS apps'), 'schema.sql must cont
 assert(schema.includes('CREATE TABLE IF NOT EXISTS app_versions'), 'schema.sql must contain app_versions table');
 assert(schema.includes('CREATE TABLE IF NOT EXISTS files'), 'schema.sql must contain files table');
 assert(schema.includes('CREATE TABLE IF NOT EXISTS system_settings'), 'schema.sql must contain system_settings table');
+assert(schema.includes('CREATE TABLE IF NOT EXISTS version_packages'), 'schema.sql must contain version_packages table');
+assert(cleanSchema.includes('CREATE TABLE IF NOT EXISTS version_packages'), 'schema.clean.sql must contain version_packages table');
 assert(schema.includes('api_token_enabled'), 'schema.sql must contain default settings');
 assert(schema.includes('api_fixed_token'), 'schema.sql must contain api_fixed_token default');
 console.log('  ✅ schema.sql and schema.clean.sql verified.');
@@ -183,11 +185,14 @@ async function testAppRouting() {
   assert(rootHtml.includes('R2 存储自动清理策略'), 'Dashboard HTML should include auto-cleanup settings card');
   assert(rootHtml.includes('modal-edit-version'), 'Dashboard HTML should include edit version modal');
   assert(rootHtml.includes('openEditVersionModal'), 'Dashboard HTML should include openEditVersionModal function');
+  assert(rootHtml.includes('modal-add-package'), 'Dashboard HTML should include add package modal');
+  assert(rootHtml.includes('modal-edit-package'), 'Dashboard HTML should include edit package modal');
+  assert(rootHtml.includes('openAddPackageModal'), 'Dashboard HTML should include openAddPackageModal function');
   assert(rootHtml.includes('cfg-github-token'), 'Dashboard HTML should include GitHub token setting input');
   assert(rootHtml.includes('data-tab="mcp"'), 'Dashboard HTML should include MCP nav-tab');
   assert(rootHtml.includes('id="tab-mcp"'), 'Dashboard HTML should include tab-mcp section');
   assert(typeof app.scheduled === 'function', 'Worker export must include scheduled handler for Cron triggers');
-  console.log('  ✅ GET /, /admin, /health routing, Edit Version UI, GitHub Token UI, MCP Hub UI & scheduled cron handler verified.');
+  console.log('  ✅ GET /, /admin, /health routing, Edit Version UI, Package Modal UI, GitHub Token UI, MCP Hub UI & scheduled cron handler verified.');
 }
 
 console.log('▶ Test 8: Verifying Auto-Cleanup Service Logic (cutoff date & keep_latest filtering)');
@@ -303,14 +308,14 @@ async function testMcpFlow() {
   const resOverview = await app.fetch(new Request('http://localhost/api/mcp'), {});
   assert.strictEqual(resOverview.status, 200, 'GET /api/mcp should return HTTP 200');
   const overviewData = await resOverview.json();
-  assert.strictEqual(overviewData.tools_count, 12, 'Overview must advertise 12 tools');
+  assert.strictEqual(overviewData.tools_count, 14, 'Overview must advertise 14 tools');
   assert(overviewData.usage.desktop_config_example, 'Overview must provide desktop config example');
 
   // 2. GET /api/mcp/tools
   const resTools = await app.fetch(new Request('http://localhost/api/mcp/tools'), {});
   assert.strictEqual(resTools.status, 200, 'GET /api/mcp/tools should return HTTP 200');
   const toolsData = await resTools.json();
-  assert.strictEqual(toolsData.data.total_tools, 12, 'GET /api/mcp/tools should list all 12 tools');
+  assert.strictEqual(toolsData.data.total_tools, 14, 'GET /api/mcp/tools should list all 14 tools');
 
   // 3. Mock DB for MCP execution
   const createMcpMockDb = () => ({
@@ -403,7 +408,7 @@ async function testMcpFlow() {
   );
   assert.strictEqual(resList.status, 200);
   const listResult = await resList.json();
-  assert.strictEqual(listResult.result.tools.length, 12, 'tools/list should return 12 tools');
+  assert.strictEqual(listResult.result.tools.length, 14, 'tools/list should return 14 tools');
 
   // 6. POST /api/mcp JSON-RPC tools/call: ygg_list_apps
   const resCallApps = await app.fetch(
@@ -468,7 +473,7 @@ async function testMcpFlow() {
           const msg = JSON.parse(line);
           if (msg.id === 10) {
             clearTimeout(timeout);
-            assert.strictEqual(msg.result.tools.length, 12, 'STDIO server must return 12 tools');
+            assert.strictEqual(msg.result.tools.length, 14, 'STDIO server must return 14 tools');
             child.kill();
             resolve();
             return;
@@ -499,12 +504,185 @@ async function testMcpFlow() {
   console.log('  ✅ MCP HTTP JSON-RPC 2.0 endpoints, tool execution, and STDIO server verified successfully.');
 }
 
+console.log('▶ Test 11: Verifying Multi-Platform & Multi-Architecture Package Distribution');
+async function testMultiPlatformPackages() {
+  const { default: app } = await import('../dist/worker.js');
+
+  const appRecord = {
+    id: 'app_valhalla',
+    app_id: 'com.norns.valhalla',
+    name: 'Valhalla',
+    created_at: new Date().toISOString(),
+  };
+
+  const versionRecord = {
+    id: 'ver_valhalla_100',
+    app_id: 'com.norns.valhalla',
+    version_code: 100,
+    version_name: '1.0.0',
+    min_version_code: 0,
+    channel: 'default',
+    changelog: 'Multi-platform release',
+    file_key: 'pkg_win_key',
+    file_name: 'valhalla-win-x64.zip',
+    file_size: 1048576,
+    is_force_update: 0,
+    is_published: 1,
+    external_url: 'https://download.example.com/valhalla-win-x64.zip',
+    use_proxy: 0,
+    is_cleaned: 0,
+    platform: 'windows',
+    arch: 'x86_64',
+    download_count: 5,
+    created_at: new Date().toISOString(),
+  };
+
+  const packagesList = [
+    {
+      id: 'pkg_win',
+      version_id: 'ver_valhalla_100',
+      app_id: 'com.norns.valhalla',
+      platform: 'windows',
+      arch: 'x86_64',
+      file_key: 'pkg_win_key',
+      file_name: 'valhalla-win-x64.zip',
+      file_size: 1048576,
+      external_url: 'https://download.example.com/valhalla-win-x64.zip',
+      use_proxy: 0,
+      is_cleaned: 0,
+      download_count: 5,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'pkg_arm',
+      version_id: 'ver_valhalla_100',
+      app_id: 'com.norns.valhalla',
+      platform: 'android',
+      arch: 'arm64-v8a',
+      file_key: 'pkg_arm_key',
+      file_name: 'valhalla-arm64.apk',
+      file_size: 2097152,
+      external_url: 'https://download.example.com/valhalla-arm64.apk',
+      use_proxy: 0,
+      is_cleaned: 0,
+      download_count: 10,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'pkg_uni',
+      version_id: 'ver_valhalla_100',
+      app_id: 'com.norns.valhalla',
+      platform: 'universal',
+      arch: 'universal',
+      file_key: 'pkg_uni_key',
+      file_name: 'valhalla-universal.zip',
+      file_size: 3145728,
+      external_url: 'https://download.example.com/valhalla-universal.zip',
+      use_proxy: 0,
+      is_cleaned: 0,
+      download_count: 2,
+      created_at: new Date().toISOString(),
+    },
+  ];
+
+  const createMultiPkgMockDb = (packages = packagesList) => ({
+    prepare: (sql) => ({
+      bind: (...args) => ({
+        first: async () => {
+          if (sql.includes('FROM apps')) return appRecord;
+          if (sql.includes('FROM app_versions')) return versionRecord;
+          if (sql.includes('FROM version_packages WHERE id = ?')) {
+            return packages.find(p => p.id === args[0]) || null;
+          }
+          return null;
+        },
+        all: async () => {
+          if (sql.includes('FROM version_packages WHERE version_id = ?')) {
+            return { results: packages };
+          }
+          return { results: [] };
+        },
+        run: async () => ({ success: true }),
+      }),
+      first: async () => {
+        if (sql.includes('FROM apps')) return appRecord;
+        if (sql.includes('FROM app_versions')) return versionRecord;
+        return null;
+      },
+      all: async () => {
+        if (sql.includes('FROM version_packages')) return { results: packages };
+        return { results: [] };
+      },
+      run: async () => ({ success: true }),
+    }),
+  });
+
+  const mockDb = createMultiPkgMockDb();
+
+  // 1. Client check update: request windows + x86_64
+  const resWin = await app.fetch(
+    new Request('http://localhost/api/v1/app/latest?app_id=com.norns.valhalla&current_version_code=90&platform=windows&arch=x86_64'),
+    { DB: mockDb }
+  );
+  assert.strictEqual(resWin.status, 200);
+  const dataWin = await resWin.json();
+  assert.strictEqual(dataWin.code, 0);
+  assert.strictEqual(dataWin.data.has_update, true);
+  assert.strictEqual(dataWin.data.file_name, 'valhalla-win-x64.zip');
+  assert.strictEqual(dataWin.data.platform, 'windows');
+  assert.strictEqual(dataWin.data.arch, 'x86_64');
+  assert.strictEqual(dataWin.data.packages.length, 3);
+  assert(dataWin.data.download_url.includes('platform=windows'));
+
+  // 2. Client check update: request android + arm64-v8a
+  const resArm = await app.fetch(
+    new Request('http://localhost/api/v1/app/latest?app_id=com.norns.valhalla&current_version_code=90&platform=android&arch=arm64-v8a'),
+    { DB: mockDb }
+  );
+  assert.strictEqual(resArm.status, 200);
+  const dataArm = await resArm.json();
+  assert.strictEqual(dataArm.data.file_name, 'valhalla-arm64.apk');
+  assert.strictEqual(dataArm.data.platform, 'android');
+  assert.strictEqual(dataArm.data.arch, 'arm64-v8a');
+  assert(dataArm.data.download_url.includes('package_id=pkg_arm'));
+
+  // 3. Download matching: by platform & arch
+  const resDlWin = await app.fetch(
+    new Request('http://localhost/api/v1/app/download?app_id=com.norns.valhalla&platform=windows&arch=x86_64'),
+    { DB: mockDb }
+  );
+  assert.strictEqual(resDlWin.status, 302);
+  assert.strictEqual(resDlWin.headers.get('Location'), 'https://download.example.com/valhalla-win-x64.zip');
+
+  // 4. Download matching: by specific package_id
+  const resDlPkg = await app.fetch(
+    new Request('http://localhost/api/v1/app/download?app_id=com.norns.valhalla&package_id=pkg_arm'),
+    { DB: mockDb }
+  );
+  assert.strictEqual(resDlPkg.status, 302);
+  assert.strictEqual(resDlPkg.headers.get('Location'), 'https://download.example.com/valhalla-arm64.apk');
+
+  // 5. Legacy version fallback when version_packages has no rows
+  const mockLegacyDb = createMultiPkgMockDb([]);
+  const resLegacy = await app.fetch(
+    new Request('http://localhost/api/v1/app/latest?app_id=com.norns.valhalla&current_version_code=90'),
+    { DB: mockLegacyDb }
+  );
+  assert.strictEqual(resLegacy.status, 200);
+  const dataLegacy = await resLegacy.json();
+  assert.strictEqual(dataLegacy.data.packages.length, 1);
+  assert.strictEqual(dataLegacy.data.packages[0].platform, 'windows');
+
+  console.log('  ✅ Multi-platform matching, architecture filtering, package_id download, and legacy fallback verified.');
+}
+
 async function main() {
   await testJwt();
   await testAppRouting();
   testCleanupLogic();
   await testExternalUrlAndCleanedFlow();
   await testMcpFlow();
+  await testMultiPlatformPackages();
   console.log('\n🎉 ALL SYSTEM TESTS PASSED SUCCESSFULLY! 🚀\n');
 }
 

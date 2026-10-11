@@ -42,7 +42,7 @@ export const YGG_MCP_TOOLS: McpToolDefinition[] = [
   },
   {
     name: 'ygg_check_update',
-    description: '客户端检测更新模拟：传入应用 app_id、客户端当前版本号 version_code、以及发布渠道 channel，检测是否有新版本可供升级，并返回下载直链与更新日志。',
+    description: '客户端检测更新模拟：传入应用 app_id、客户端当前版本号 version_code、发布渠道 channel、目标平台 platform 及架构 arch，检测是否有新版本可供升级，并返回最适合当前系统的下载直链与全平台安装包列表。',
     inputSchema: {
       type: 'object',
       properties: {
@@ -57,6 +57,14 @@ export const YGG_MCP_TOOLS: McpToolDefinition[] = [
         channel: {
           type: 'string',
           description: '发布渠道 (如 default, beta, googleplay，默认为 default)'
+        },
+        platform: {
+          type: 'string',
+          description: '客户端操作系统平台 (如 android, windows, macos, linux, ios，默认为 universal/android)'
+        },
+        arch: {
+          type: 'string',
+          description: '客户端 CPU 架构 (如 universal, arm64-v8a, x86_64, apple-silicon)'
         }
       },
       required: ['app_id']
@@ -177,6 +185,14 @@ export const YGG_MCP_TOOLS: McpToolDefinition[] = [
         file_size: {
           type: 'number',
           description: '文件大小 (字节数)'
+        },
+        platform: {
+          type: 'string',
+          description: '主包平台标识 (如 android, windows, macos, linux, ios，默认为 android)'
+        },
+        arch: {
+          type: 'string',
+          description: '主包 CPU 架构 (如 universal, arm64-v8a, x86_64，默认为 universal)'
         }
       },
       required: ['app_id', 'version_code', 'version_name']
@@ -286,6 +302,70 @@ export const YGG_MCP_TOOLS: McpToolDefinition[] = [
           description: '文件分类过滤 (如 general, config, apk)'
         }
       }
+    }
+  },
+  {
+    name: 'ygg_add_version_package',
+    description: '为指定应用版本附加新的多平台或多架构分发安装包（如 Windows x86_64、Android arm64-v8a、macOS Apple Silicon 等）。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        version_id: {
+          type: 'string',
+          description: '所属版本的唯一 ID (如 ver_xxx)'
+        },
+        platform: {
+          type: 'string',
+          description: '目标操作系统平台 (android, windows, macos, linux, ios, universal)'
+        },
+        arch: {
+          type: 'string',
+          description: '目标 CPU 架构 (universal, arm64-v8a, armeabi-v7a, x86_64, x86, apple-silicon)'
+        },
+        external_url: {
+          type: 'string',
+          description: '第三方安装包下载直链 (免上传)'
+        },
+        use_proxy: {
+          type: 'boolean',
+          description: '是否开启边缘反向代理流式加速'
+        },
+        file_key: {
+          type: 'string',
+          description: '已上传至 R2 的存储 Key'
+        },
+        file_name: {
+          type: 'string',
+          description: '下载时保存的文件名'
+        },
+        file_size: {
+          type: 'number',
+          description: '文件大小 (字节数)'
+        },
+        file_md5: {
+          type: 'string',
+          description: 'MD5 校验和'
+        },
+        file_sha256: {
+          type: 'string',
+          description: 'SHA256 校验和'
+        }
+      },
+      required: ['version_id', 'platform', 'arch']
+    }
+  },
+  {
+    name: 'ygg_delete_version_package',
+    description: '删除指定应用版本名下的某个分发安装包并物理删除对应 R2 存储。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        package_id: {
+          type: 'string',
+          description: '需要删除的分发安装包唯一 ID (如 pkg_xxx)'
+        }
+      },
+      required: ['package_id']
     }
   }
 ];

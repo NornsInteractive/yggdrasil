@@ -108,7 +108,7 @@ adminAppsRoutes.get('/api/admin/apps/:appId/versions', async (c) => {
 });
 
 /**
- * 发布新版本
+ * 发布新版本 (支持多平台/多架构主包与附加分发包)
  * POST /api/admin/apps/:appId/versions
  */
 adminAppsRoutes.post('/api/admin/apps/:appId/versions', async (c) => {
@@ -129,10 +129,23 @@ adminAppsRoutes.post('/api/admin/apps/:appId/versions', async (c) => {
       is_published?: number;
       external_url?: string;
       use_proxy?: number;
+      platform?: string;
+      arch?: string;
+      packages?: Array<{
+        platform?: string;
+        arch?: string;
+        file_key?: string;
+        file_name?: string;
+        file_size?: number;
+        file_md5?: string;
+        file_sha256?: string;
+        external_url?: string;
+        use_proxy?: number;
+      }>;
     }>();
 
     if (!body.version_code || !body.version_name || (!body.file_key && !body.external_url)) {
-      return c.json({ code: 400, message: '必须填写版本号、版本名称，并选择上传 APK 文件或填写第三方下载直链' }, 400);
+      return c.json({ code: 400, message: '必须填写版本号、版本名称，并选择上传安装包文件或填写第三方下载直链' }, 400);
     }
 
     if (body.external_url && body.external_url.trim()) {
@@ -203,5 +216,114 @@ adminAppsRoutes.delete('/api/admin/versions/:id', async (c) => {
     return c.json({ code: 0, message: 'Version deleted successfully' });
   } catch (e: any) {
     return c.json({ code: 500, message: 'Failed to delete version: ' + e.message }, 500);
+  }
+});
+
+/**
+ * 获取指定版本的所有分发安装包列表
+ * GET /api/admin/versions/:versionId/packages
+ */
+adminAppsRoutes.get('/api/admin/versions/:versionId/packages', async (c) => {
+  const versionId = c.req.param('versionId');
+  const pkgs = await AppService.listPackagesByVersionId(c.env.DB, versionId);
+  return c.json({ code: 0, message: 'success', data: pkgs });
+});
+
+/**
+ * 为指定版本新增分发安装包 (不同平台/架构)
+ * POST /api/admin/versions/:versionId/packages
+ */
+adminAppsRoutes.post('/api/admin/versions/:versionId/packages', async (c) => {
+  try {
+    const versionId = c.req.param('versionId');
+    const version = await AppService.getVersionById(c.env.DB, versionId);
+    if (!version) {
+      return c.json({ code: 404, message: 'Version not found' }, 404);
+    }
+
+    const body = await c.req.json<{
+      platform?: string;
+      arch?: string;
+      file_key?: string;
+      file_name?: string;
+      file_size?: number;
+      file_md5?: string;
+      file_sha256?: string;
+      external_url?: string;
+      use_proxy?: number;
+    }>();
+
+    if (!body.file_key && !body.external_url) {
+      return c.json({ code: 400, message: '必须选择上传安装包文件或填写第三方下载直链' }, 400);
+    }
+
+    if (body.external_url && body.external_url.trim()) {
+      const ext = body.external_url.trim();
+      if (!ext.startsWith('http://') && !ext.startsWith('https://')) {
+        return c.json({ code: 400, message: '第三方下载直链必须以 http:// 或 https:// 开头' }, 400);
+      }
+      if (ext.includes('/api/v1/app/download')) {
+        return c.json({ code: 400, message: '第三方直链不能填写当前网关自身的 /api/v1/app/download 地址' }, 400);
+      }
+    }
+
+    const pkg = await AppService.createPackage(c.env.DB, {
+      ...body,
+      version_id: versionId,
+      app_id: version.app_id,
+    });
+
+    return c.json({ code: 0, message: 'Package added successfully', data: pkg });
+  } catch (e: any) {
+    return c.json({ code: 500, message: 'Failed to add package: ' + e.message }, 500);
+  }
+});
+
+/**
+ * 修改分发安装包信息
+ * PUT /api/admin/packages/:packageId
+ */
+adminAppsRoutes.put('/api/admin/packages/:packageId', async (c) => {
+  try {
+    const packageId = c.req.param('packageId');
+    const body = await c.req.json<{
+      platform?: string;
+      arch?: string;
+      file_name?: string;
+      file_size?: number;
+      file_md5?: string;
+      file_sha256?: string;
+      external_url?: string;
+      use_proxy?: number;
+    }>();
+
+    if (body.external_url && body.external_url.trim()) {
+      const ext = body.external_url.trim();
+      if (!ext.startsWith('http://') && !ext.startsWith('https://')) {
+        return c.json({ code: 400, message: '第三方下载直链必须以 http:// 或 https:// 开头' }, 400);
+      }
+      if (ext.includes('/api/v1/app/download')) {
+        return c.json({ code: 400, message: '第三方直链不能填写当前网关自身的 /api/v1/app/download 地址' }, 400);
+      }
+    }
+
+    await AppService.updatePackage(c.env.DB, packageId, body);
+    return c.json({ code: 0, message: 'Package updated successfully' });
+  } catch (e: any) {
+    return c.json({ code: 500, message: 'Failed to update package: ' + e.message }, 500);
+  }
+});
+
+/**
+ * 删除分发安装包及对应的 R2 存储
+ * DELETE /api/admin/packages/:packageId
+ */
+adminAppsRoutes.delete('/api/admin/packages/:packageId', async (c) => {
+  try {
+    const packageId = c.req.param('packageId');
+    await AppService.deletePackage(c.env.DB, c.env.BUCKET, packageId);
+    return c.json({ code: 0, message: 'Package deleted successfully' });
+  } catch (e: any) {
+    return c.json({ code: 500, message: 'Failed to delete package: ' + e.message }, 500);
   }
 });

@@ -12,6 +12,22 @@ import { tokenGuard } from '../middleware/tokenGuard';
 
 export const clientAppRoutes = new Hono<{ Bindings: Env }>();
 
+function getPackageContentType(fileName: string): string {
+  const lower = (fileName || '').toLowerCase();
+  if (lower.endsWith('.apk')) return 'application/vnd.android.package-archive';
+  if (lower.endsWith('.ipa')) return 'application/octet-stream';
+  if (lower.endsWith('.exe')) return 'application/x-msdownload';
+  if (lower.endsWith('.msi')) return 'application/x-msi';
+  if (lower.endsWith('.dmg')) return 'application/x-apple-diskimage';
+  if (lower.endsWith('.pkg')) return 'application/octet-stream';
+  if (lower.endsWith('.deb')) return 'application/vnd.debian.binary-package';
+  if (lower.endsWith('.rpm')) return 'application/x-rpm';
+  if (lower.endsWith('.appimage')) return 'application/octet-stream';
+  if (lower.endsWith('.zip')) return 'application/zip';
+  if (lower.endsWith('.tar.gz') || lower.endsWith('.tgz')) return 'application/gzip';
+  return 'application/octet-stream';
+}
+
 /**
  * 客户端 App 版本检测接口
  * GET /api/v1/app/latest
@@ -29,9 +45,19 @@ const handleVersionCheck = async (c: any) => {
   const rawVersionCode = c.req.query('version_code') || c.req.query('versionCode') || '0';
   const currentVersionCode = parseInt(rawVersionCode, 10) || 0;
   const channel = c.req.query('channel') || 'default';
+  const platform = c.req.query('platform');
+  const arch = c.req.query('arch');
 
   const originUrl = new URL(c.req.url).origin;
-  const checkResult = await AppService.checkAppUpdate(c.env.DB, appId, currentVersionCode, channel, originUrl);
+  const checkResult = await AppService.checkAppUpdate(
+    c.env.DB,
+    appId,
+    currentVersionCode,
+    channel,
+    originUrl,
+    platform,
+    arch
+  );
 
   if (!checkResult) {
     return c.json({
@@ -51,7 +77,7 @@ clientAppRoutes.get('/api/v1/app/latest', tokenGuard('app_check'), handleVersion
 clientAppRoutes.get('/api/v1/version/check', tokenGuard('app_check'), handleVersionCheck);
 
 /**
- * 客户端 App APK 下载接口 (支持 HTTP Range 206 断点续传)
+ * 客户端 App APK/安装包下载接口 (支持多平台/多架构分发与 HTTP Range 206 断点续传)
  * GET /api/v1/app/download
  */
 clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c) => {
@@ -63,42 +89,54 @@ clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c
   const rawVersionCode = c.req.query('version_code') || c.req.query('versionCode');
   const versionCode = rawVersionCode ? parseInt(rawVersionCode, 10) : undefined;
   const channel = c.req.query('channel') || 'default';
+  const platform = c.req.query('platform');
+  const arch = c.req.query('arch');
+  const packageId = c.req.query('package_id') || c.req.query('packageId');
 
   const version = await AppService.getVersionForDownload(c.env.DB, appId, versionCode, channel);
   if (!version) {
-    return c.json({ code: 404, message: 'Requested APK version not found or not published' }, 404);
+    return c.json({ code: 404, message: 'Requested App version not found or not published' }, 404);
   }
 
-  // 异步增加下载次数 (不阻塞下载响应)
+  // 为当前版本匹配最佳安装包 (或精准定位指定 package_id)
+  const targetPkg = await AppService.getPackageForDownload(c.env.DB, version, platform, arch, packageId);
+
+  // 异步增加主版本与具体安装包下载次数 (不阻塞下载响应)
   try {
-    c.executionCtx.waitUntil(AppService.incrementDownloadCount(c.env.DB, version.id));
+    c.executionCtx.waitUntil(Promise.all([
+      AppService.incrementDownloadCount(c.env.DB, version.id),
+      targetPkg.id && !targetPkg.id.startsWith('pkg_def_') ? AppService.incrementPackageDownloadCount(c.env.DB, targetPkg.id) : Promise.resolve(),
+    ]));
   } catch (e) {
     AppService.incrementDownloadCount(c.env.DB, version.id).catch(() => {});
+    if (targetPkg.id && !targetPkg.id.startsWith('pkg_def_')) {
+      AppService.incrementPackageDownloadCount(c.env.DB, targetPkg.id).catch(() => {});
+    }
   }
 
-  // 1. 如果该版本的安装包已被历史策略清理
-  if (version.is_cleaned === 1 && !version.external_url) {
+  // 1. 如果该安装包已被历史策略清理
+  if (targetPkg.is_cleaned === 1 && !targetPkg.external_url) {
     return c.json({
       code: 410,
-      message: `版本 ${version.version_name} (Code: ${version.version_code}) 的历史安装包已被存储自动清理策略归档清理。请下载最新版本。`,
+      message: `版本 ${version.version_name} (Code: ${version.version_code}, 平台: ${targetPkg.platform}, 架构: ${targetPkg.arch}) 的历史安装包已被存储自动清理策略归档清理。请下载最新版本。`,
     }, 410);
   }
 
   // 2. 如果配置了第三方外链
-  if (version.external_url && version.external_url.trim()) {
-    const extUrl = version.external_url.trim();
+  if (targetPkg.external_url && targetPkg.external_url.trim()) {
+    const extUrl = targetPkg.external_url.trim();
 
     // 2.0 防御循环重定向：如果外部直链指向当前网关自身的下载地址，直接报错阻止
     const currentOrigin = new URL(c.req.url).origin;
     if (extUrl.startsWith(currentOrigin) || extUrl.includes('/api/v1/app/download')) {
       return c.json({
         code: 400,
-        message: '配置错误：第三方外链 (external_url) 不能指向当前网关自身的下载接口 (/api/v1/app/download)，否则会造成无限重定向循环。请在后台管理界面修改此版本的外部下载直链。',
+        message: '配置错误：第三方外链 (external_url) 不能指向当前网关自身的下载接口 (/api/v1/app/download)，否则会造成无限重定向循环。请在后台管理界面修改此安装包的外部下载直链。',
       }, 400);
     }
 
     // 2.1 开启反向代理：由 Edge 节点反向代理流式传输，隐藏源站并支持断点续传
-    if (version.use_proxy === 1) {
+    if (targetPkg.use_proxy === 1) {
       const forwardHeaders = new Headers();
       const rangeHeader = c.req.header('range');
       if (rangeHeader) forwardHeaders.set('Range', rangeHeader);
@@ -206,13 +244,13 @@ clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c
         // 白名单提取有效响应头，避免透传 hop-by-hop (如 connection) 或上游安全策略 (CSP) 破坏客户端下载
         const resHeaders = new Headers();
         const contentType = proxyRes.headers.get('content-type');
+        const fileName = targetPkg.file_name || `app-v${version.version_name}-${targetPkg.platform}-${targetPkg.arch}`;
         if (contentType && !contentType.includes('text/html') && !contentType.includes('text/plain')) {
           resHeaders.set('Content-Type', contentType);
         } else {
-          resHeaders.set('Content-Type', 'application/vnd.android.package-archive');
+          resHeaders.set('Content-Type', getPackageContentType(fileName));
         }
 
-        const fileName = version.file_name || `app-v${version.version_name}.apk`;
         resHeaders.set('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
         resHeaders.set('Accept-Ranges', 'bytes');
         resHeaders.set('Cache-Control', 'public, max-age=3600');
@@ -247,11 +285,12 @@ clientAppRoutes.get('/api/v1/app/download', tokenGuard('app_download'), async (c
 
   // 3. 正常 R2 本地文件流式提供下载，并处理 Range 头部以实现断点续传
   const rangeHeader = c.req.header('range');
+  const finalFileName = targetPkg.file_name || `app-v${version.version_name}-${targetPkg.platform}-${targetPkg.arch}`;
   return await StorageService.serveFileWithRange(
     c.env.BUCKET,
-    version.file_key,
-    version.file_name,
+    targetPkg.file_key || '',
+    finalFileName,
     rangeHeader,
-    'application/vnd.android.package-archive'
+    getPackageContentType(finalFileName)
   );
 });

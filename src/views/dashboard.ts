@@ -1067,6 +1067,33 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
               </div>
             </div>
 
+            <div class="form-row">
+              <div class="form-col form-group">
+                <label class="form-label">操作系统平台 (Platform)</label>
+                <select id="pg-platform" class="form-control" onchange="updatePlaygroundCurl()">
+                  <option value="">全部 / 自动匹配</option>
+                  <option value="android">Android</option>
+                  <option value="windows">Windows</option>
+                  <option value="macos">macOS</option>
+                  <option value="linux">Linux</option>
+                  <option value="ios">iOS</option>
+                  <option value="universal">Universal</option>
+                </select>
+              </div>
+              <div class="form-col form-group">
+                <label class="form-label">CPU 架构 (Arch)</label>
+                <select id="pg-arch" class="form-control" onchange="updatePlaygroundCurl()">
+                  <option value="">全部 / 自动匹配</option>
+                  <option value="universal">Universal</option>
+                  <option value="arm64-v8a">arm64-v8a</option>
+                  <option value="armeabi-v7a">armeabi-v7a</option>
+                  <option value="x86_64">x86_64</option>
+                  <option value="x86">x86</option>
+                  <option value="apple-silicon">apple-silicon</option>
+                </select>
+              </div>
+            </div>
+
             <div class="form-group">
               <label class="form-label">API Token (可选)</label>
               <input type="text" id="pg-token" class="form-control mono" placeholder="若开启了鉴权，在此填入 Token" />
@@ -1102,7 +1129,7 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
             <span style="font-size: 1.5rem;">🤖</span>
             <div>
               <div style="font-weight: 700; font-size: 0.95rem; color: #c084fc;">需要使用 Cursor、Claude Desktop 等 AI 助手直接调用？</div>
-              <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">Yggdrasil 现已全面支持 Model Context Protocol (MCP) 开放标准，提供 12 项原生管理 Tools</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">Yggdrasil 现已全面支持 Model Context Protocol (MCP) 开放标准，提供 14 项原生管理 Tools</div>
             </div>
           </div>
           <button class="btn btn-primary btn-sm" onclick="switchTab('mcp')">前往 MCP 协议中心 ➔</button>
@@ -1156,6 +1183,20 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
                 <td class="mono">default / beta</td>
               </tr>
               <tr>
+                <td class="mono">platform</td>
+                <td>String</td>
+                <td>否</td>
+                <td>目标操作系统平台 (android, windows, macos, linux, ios, universal)，用于自动匹配最佳安装包</td>
+                <td class="mono">windows / android</td>
+              </tr>
+              <tr>
+                <td class="mono">arch</td>
+                <td>String</td>
+                <td>否</td>
+                <td>客户端 CPU 架构 (universal, arm64-v8a, armeabi-v7a, x86_64, x86, apple-silicon)</td>
+                <td class="mono">x86_64</td>
+              </tr>
+              <tr>
                 <td class="mono">token</td>
                 <td>String</td>
                 <td>否</td>
@@ -1180,11 +1221,31 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
     "latest_version_name": "1.2.0",
     "min_version_code": 10000,
     "channel": "default",
+    "platform": "windows",
+    "arch": "x86_64",
     "changelog": "- 优化文件下载速度\n- 修复已知崩溃Bug",
-    "download_url": "https://your-worker.workers.dev/api/v1/app/download?app_id=com.example.app&version_code=10200",
-    "file_name": "app-v1.2.0.apk",
+    "download_url": "https://your-worker.workers.dev/api/v1/app/download?app_id=com.example.app&version_code=10200&platform=windows&arch=x86_64",
+    "file_name": "app-v1.2.0-windows-x86_64.zip",
     "file_size": 45829104,
     "file_md5": "e10adc3949ba59abbe56e057f20f883e",
+    "packages": [
+      {
+        "id": "pkg_win64",
+        "platform": "windows",
+        "arch": "x86_64",
+        "file_name": "app-windows-x64.zip",
+        "file_size": 45829104,
+        "download_url": "https://your-worker.workers.dev/api/v1/app/download?app_id=com.example.app&version_code=10200&package_id=pkg_win64"
+      },
+      {
+        "id": "pkg_arm64",
+        "platform": "android",
+        "arch": "arm64-v8a",
+        "file_name": "app-android-arm64.apk",
+        "file_size": 38401920,
+        "download_url": "https://your-worker.workers.dev/api/v1/app/download?app_id=com.example.app&version_code=10200&package_id=pkg_arm64"
+      }
+    ],
     "release_time": "2026-08-18T10:00:00Z"
   }
 }</div>
@@ -1200,14 +1261,14 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
             <button class="btn btn-secondary btn-sm" onclick="copyText(window.location.origin + '/api/v1/app/download', '接口路径已复制')">复制 URL</button>
           </div>
           <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem;">
-            APK 安装包下载接口。原生支持 <b>HTTP Range 206 断点续传</b>，兼容 Android 系统自带 DownloadManager、OkHttp、iOS 下载组件及各大下载器。
+            安装包下载接口。支持 <code class="mono">platform</code>、<code class="mono">arch</code> 智能调度或 <code class="mono">package_id</code> 精准定位，原生支持 <b>HTTP Range 206 断点续传</b>，兼容 Windows、Android、macOS、iOS、Linux 等各大主流下载器。
           </p>
           <div class="code-box"># 断点续传测试 (分片请求 Range: bytes=0-1023)
-curl -i -H "Range: bytes=0-1023" "https://your-worker.workers.dev/api/v1/app/download?app_id=com.example.app"
+curl -i -H "Range: bytes=0-1023" "https://your-worker.workers.dev/api/v1/app/download?app_id=com.example.app&platform=windows&arch=x86_64"
 
 # 返回响应头:
 HTTP/1.1 206 Partial Content
-Content-Type: application/vnd.android.package-archive
+Content-Type: application/zip
 Accept-Ranges: bytes
 Content-Range: bytes 0-1023/45829104
 Content-Length: 1024</div>
@@ -1257,7 +1318,7 @@ val downloadReq = Request.Builder()
             <button class="btn btn-secondary btn-sm" onclick="copyText(window.location.origin + '/api/mcp', 'MCP URL 已复制')">复制 MCP URL</button>
           </div>
           <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.75rem;">
-            原生支持 <b>Model Context Protocol (MCP)</b> 协议。Cursor、Claude Desktop、Antigravity CLI、Windsurf 等 AI 助手可直接连接并调用 12 项管理工具。
+            原生支持 <b>Model Context Protocol (MCP)</b> 协议。Cursor、Claude Desktop、Antigravity CLI、Windsurf 等 AI 助手可直接连接并调用 14 项管理工具。
           </p>
           <div class="code-box"># Cursor / Claude Desktop 配置模版 (claude_desktop_config.json / mcp.json):
 {
@@ -1283,7 +1344,7 @@ val downloadReq = Request.Builder()
               <span style="font-size: 1.4rem;">🤖</span>
               <h2 style="font-size: 1.3rem; font-weight: 800; margin: 0; letter-spacing: -0.02em;">Model Context Protocol (MCP) 智能调用中心</h2>
               <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; font-weight: 700;">🟢 服务已就绪</span>
-              <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; font-weight: 700;">12 项原生 Tools</span>
+              <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; font-weight: 700;">14 项原生 Tools</span>
             </div>
             <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0; max-width: 720px; line-height: 1.6;">
               Yggdrasil 现已全面接入 MCP 开放协议标准！AI 助手（Cursor、Claude Desktop、Antigravity CLI、Windsurf、Cline 等）可原生感知并直接控制应用发版、版本检测、存储监控与旧包清理。
@@ -1341,7 +1402,7 @@ val downloadReq = Request.Builder()
         <!-- 在线测试 MCP 工具调用 -->
         <div class="stat-card" style="margin-bottom: 1.5rem;">
           <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 0.25rem;">🧪 在线 MCP 工具调用调试器</h3>
-          <p style="color: var(--text-muted); font-size: 0.825rem; margin-bottom: 1rem;">直接在浏览器中实时调用 12 项 MCP Tools，验证边缘执行与响应结果</p>
+          <p style="color: var(--text-muted); font-size: 0.825rem; margin-bottom: 1rem;">直接在浏览器中实时调用 14 项 MCP Tools，验证边缘执行与响应结果</p>
 
           <div class="form-row">
             <div class="form-col form-group">
@@ -1351,6 +1412,8 @@ val downloadReq = Request.Builder()
                 <option value="ygg_get_app_details">ygg_get_app_details (获取指定应用详情与版本历史)</option>
                 <option value="ygg_get_system_stats">ygg_get_system_stats (获取全局系统统计与存储占用)</option>
                 <option value="ygg_check_update">ygg_check_update (检测版本更新模拟)</option>
+                <option value="ygg_add_version_package">ygg_add_version_package (为版本新增分发安装包)</option>
+                <option value="ygg_delete_version_package">ygg_delete_version_package (删除指定分发安装包)</option>
                 <option value="ygg_list_files">ygg_list_files (列出通用文件)</option>
                 <option value="ygg_trigger_cleanup">ygg_trigger_cleanup (执行旧版本存储清理)</option>
               </select>
@@ -1372,18 +1435,18 @@ val downloadReq = Request.Builder()
           </div>
         </div>
 
-        <!-- 12 项 MCP 工具全览 (卡片 Bento 列表) -->
+        <!-- 14 项 MCP 工具全览 (卡片 Bento 列表) -->
         <div class="stat-card" style="margin-bottom: 1.5rem;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
             <div>
-              <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 0.2rem;">🛠️ 原生可用 MCP Tools 全览 (共 12 项)</h3>
+              <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 0.2rem;">🛠️ 原生可用 MCP Tools 全览 (共 14 项)</h3>
               <p style="color: var(--text-muted); font-size: 0.825rem; margin: 0;">AI 代理连接后将自动识别以下能力，可在对话中直接指示 AI 调用</p>
             </div>
             <input type="text" id="mcp-tool-filter" class="form-control" style="width: 240px;" placeholder="🔍 快速过滤工具名称..." oninput="filterMcpToolCards(this.value)" />
           </div>
 
           <div class="mcp-grid" id="mcp-tools-container">
-            <!-- 动态渲染 12 项工具卡片 -->
+            <!-- 动态渲染 14 项工具卡片 -->
           </div>
         </div>
 
@@ -1517,6 +1580,31 @@ val downloadReq = Request.Builder()
 
         <div class="form-row">
           <div class="form-col form-group">
+            <label class="form-label">分发平台 (Platform)</label>
+            <select id="ver-form-platform" class="form-control">
+              <option value="android" selected>🤖 Android (安卓)</option>
+              <option value="windows">💻 Windows (微软桌面)</option>
+              <option value="macos">🍎 macOS (苹果桌面)</option>
+              <option value="linux">🐧 Linux (桌面/服务端)</option>
+              <option value="ios">📱 iOS (苹果手机)</option>
+              <option value="universal">🌐 Universal (跨平台通用)</option>
+            </select>
+          </div>
+          <div class="form-col form-group">
+            <label class="form-label">CPU 架构 (Architecture)</label>
+            <select id="ver-form-arch" class="form-control">
+              <option value="universal" selected>🌐 Universal (全架构通用)</option>
+              <option value="arm64-v8a">ARM64 (arm64-v8a / aarch64)</option>
+              <option value="armeabi-v7a">ARM32 (armeabi-v7a)</option>
+              <option value="x86_64">x86_64 (Intel / AMD 64位)</option>
+              <option value="x86">x86 (Intel 32位)</option>
+              <option value="apple-silicon">Apple Silicon (M1/M2/M3/M4)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-col form-group">
             <label class="form-label">版本名称 (versionName) *</label>
             <input type="text" id="ver-form-name" class="form-control" placeholder="1.2.0" required />
           </div>
@@ -1635,6 +1723,167 @@ val downloadReq = Request.Builder()
         <div class="modal-footer" style="margin-top: 1.5rem;">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modal-edit-version')">取消</button>
           <button type="submit" class="btn btn-primary" id="btn-edit-ver-submit">保存修改</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: 为版本添加分发安装包 -->
+  <div id="modal-add-package" class="modal-overlay">
+    <div class="modal-card" style="max-width: 650px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="add-pkg-modal-title">添加分发安装包</h3>
+        <button class="modal-close" onclick="closeModal('modal-add-package')">&times;</button>
+      </div>
+      <form id="form-add-package" onsubmit="handleAddPackage(event)">
+        <input type="hidden" id="add-pkg-verid" />
+        <input type="hidden" id="add-pkg-appid" />
+
+        <div class="form-row">
+          <div class="form-col form-group">
+            <label class="form-label">目标平台 (Platform) *</label>
+            <select id="add-pkg-platform" class="form-control" required>
+              <option value="android">🤖 Android (安卓)</option>
+              <option value="windows" selected>💻 Windows (微软桌面)</option>
+              <option value="macos">🍎 macOS (苹果桌面)</option>
+              <option value="linux">🐧 Linux (桌面/服务端)</option>
+              <option value="ios">📱 iOS (苹果手机)</option>
+              <option value="universal">🌐 Universal (跨平台通用)</option>
+            </select>
+          </div>
+          <div class="form-col form-group">
+            <label class="form-label">CPU 架构 (Architecture) *</label>
+            <select id="add-pkg-arch" class="form-control" required>
+              <option value="universal">🌐 Universal (全架构通用)</option>
+              <option value="x86_64" selected>x86_64 (Intel / AMD 64位)</option>
+              <option value="x86">x86 (Intel 32位)</option>
+              <option value="arm64-v8a">ARM64 (arm64-v8a / aarch64)</option>
+              <option value="armeabi-v7a">ARM32 (armeabi-v7a)</option>
+              <option value="apple-silicon">Apple Silicon (M1/M2/M3/M4)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 安装包来源切换 -->
+        <div class="form-group">
+          <label class="form-label">安装包来源方式 *</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <button type="button" id="add-pkg-mode-upload" class="btn btn-secondary btn-sm" onclick="switchAddPkgMode('upload')" style="flex: 1;">📦 上传文件到 R2 存储</button>
+            <button type="button" id="add-pkg-mode-external" class="btn btn-primary btn-sm" onclick="switchAddPkgMode('external')" style="flex: 1;">🌐 填写第三方直链 (免上传)</button>
+          </div>
+        </div>
+
+        <!-- 模式 1: R2 本地文件上传 -->
+        <div id="add-pkg-sec-upload" class="form-group hidden">
+          <label class="form-label">选择安装包文件 *</label>
+          <div id="drop-add-pkg-zone" class="upload-zone" onclick="document.getElementById('file-add-pkg-input').click()">
+            <div class="upload-icon">📦</div>
+            <div class="upload-text" id="drop-add-pkg-text">点击或将安装包拖拽至此区域</div>
+            <div class="upload-hint">支持 .apk, .exe, .msi, .dmg, .pkg, .deb, .zip, .tar.gz 等文件格式</div>
+            <input type="file" id="file-add-pkg-input" style="display: none;" onchange="onAddPkgFileSelected(this)" />
+          </div>
+          <div id="add-pkg-progress-wrap" class="progress-bar-wrap">
+            <div id="add-pkg-progress-bar" class="progress-bar-inner"></div>
+          </div>
+          <div id="add-pkg-upload-status" class="form-help" style="margin-top: 6px;"></div>
+        </div>
+
+        <!-- 模式 2: 第三方直链与反代设置 -->
+        <div id="add-pkg-sec-external" class="form-group">
+          <label class="form-label">第三方安装包下载直链 (URL) *</label>
+          <input type="url" id="add-pkg-exturl" class="form-control mono" placeholder="https://github.com/.../valhalla-windows-x64.zip" oninput="checkAddPkgSubmitReady()" />
+          <div class="form-help" style="color: #fbbf24;">⚠️ 请填写外部源站真实公开文件直链（如 GitHub Release、自建 CDN、网盘直链等）。切勿填写当前网关自身接口！</div>
+
+          <div class="switch-wrap" style="margin-top: 0.75rem;">
+            <div class="switch-info">
+              <span class="switch-title">开启边缘反向代理加速 (Reverse Proxy)</span>
+              <span class="switch-desc">关闭为 302 重定向；开启后由当前 Worker 节点代理流式传输，隐藏源站并支持断点续传</span>
+            </div>
+            <input type="checkbox" id="add-pkg-useproxy" class="switch-checkbox" />
+          </div>
+
+          <div class="form-row" style="margin-top: 0.75rem;">
+            <div class="form-col form-group">
+              <label class="form-label">文件名 (可选)</label>
+              <input type="text" id="add-pkg-filename" class="form-control" placeholder="如 valhalla-windows-x64.zip" />
+            </div>
+            <div class="form-col form-group">
+              <label class="form-label">文件大小 (字节，可选)</label>
+              <input type="number" id="add-pkg-filesize" class="form-control mono" placeholder="如 52428800" />
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer" style="margin-top: 1.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-package')">取消</button>
+          <button type="submit" id="btn-add-pkg-submit" class="btn btn-primary">确认添加安装包</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: 编辑分发安装包 -->
+  <div id="modal-edit-package" class="modal-overlay">
+    <div class="modal-card" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 class="modal-title" id="edit-pkg-modal-title">编辑分发安装包</h3>
+        <button class="modal-close" onclick="closeModal('modal-edit-package')">&times;</button>
+      </div>
+      <form id="form-edit-package" onsubmit="handleUpdatePackage(event)">
+        <input type="hidden" id="edit-pkg-id" />
+        <input type="hidden" id="edit-pkg-appid" />
+
+        <div class="form-row">
+          <div class="form-col form-group">
+            <label class="form-label">目标平台 (Platform)</label>
+            <select id="edit-pkg-platform" class="form-control">
+              <option value="android">🤖 Android</option>
+              <option value="windows">💻 Windows</option>
+              <option value="macos">🍎 macOS</option>
+              <option value="linux">🐧 Linux</option>
+              <option value="ios">📱 iOS</option>
+              <option value="universal">🌐 Universal</option>
+            </select>
+          </div>
+          <div class="form-col form-group">
+            <label class="form-label">CPU 架构 (Architecture)</label>
+            <select id="edit-pkg-arch" class="form-control">
+              <option value="universal">Universal</option>
+              <option value="x86_64">x86_64</option>
+              <option value="x86">x86</option>
+              <option value="arm64-v8a">ARM64</option>
+              <option value="armeabi-v7a">ARM32</option>
+              <option value="apple-silicon">Apple Silicon</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">文件名</label>
+          <input type="text" id="edit-pkg-filename" class="form-control" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">文件大小 (字节)</label>
+          <input type="number" id="edit-pkg-filesize" class="form-control mono" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">第三方下载直链 (可选)</label>
+          <input type="url" id="edit-pkg-exturl" class="form-control mono" />
+        </div>
+
+        <div class="switch-wrap">
+          <div class="switch-info">
+            <span class="switch-title">开启边缘反向代理加速</span>
+            <span class="switch-desc">由 Worker 代理流式传输，隐藏源站并支持断点续传</span>
+          </div>
+          <input type="checkbox" id="edit-pkg-useproxy" class="switch-checkbox" />
+        </div>
+
+        <div class="modal-footer" style="margin-top: 1.5rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modal-edit-package')">取消</button>
+          <button type="submit" class="btn btn-primary" id="btn-edit-pkg-submit">保存修改</button>
         </div>
       </form>
     </div>
@@ -2017,18 +2266,67 @@ val downloadReq = Request.Builder()
           }
 
           content.innerHTML = versions.map(v => {
-            const downloadUrl = \`\${window.location.origin}/api/v1/app/download?app_id=\${encodeURIComponent(v.app_id)}&version_code=\${v.version_code}\`;
+            const defaultDlUrl = \`\${window.location.origin}/api/v1/app/download?app_id=\${encodeURIComponent(v.app_id)}&version_code=\${v.version_code}\`;
             const isCleaned = v.is_cleaned === 1;
             const isExternal = !!v.external_url;
             const useProxy = v.use_proxy === 1;
+            const pkgs = v.packages || [];
+
+            const pkgsHtml = pkgs.length > 0 ? \`
+              <div style="margin-top: 0.85rem; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 0.85rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.35rem;">
+                  <span style="font-size: 0.8rem; font-weight: 700; color: #cbd5e1;">📦 多平台 / 架构安装包分发清单 (\${pkgs.length} 个)</span>
+                  <button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;" onclick="openAddPackageModal('\${v.id}', '\${v.app_id}', '\${v.version_name}', \${v.version_code})">➕ 附加安装包</button>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                  \${pkgs.map(p => {
+                    const pDownloadUrl = p.download_url || \`\${window.location.origin}/api/v1/app/download?app_id=\${encodeURIComponent(v.app_id)}&version_code=\${v.version_code}&package_id=\${p.id}\`;
+                    const pCleaned = p.is_cleaned === 1;
+                    const pExternal = !!p.external_url;
+                    let pIcon = '🌐';
+                    if (p.platform === 'windows') pIcon = '💻';
+                    else if (p.platform === 'macos') pIcon = '🍎';
+                    else if (p.platform === 'linux') pIcon = '🐧';
+                    else if (p.platform === 'ios') pIcon = '📱';
+                    else if (p.platform === 'android') pIcon = '🤖';
+
+                    return \`
+                      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(30, 41, 59, 0.45); border: 1px solid rgba(255, 255, 255, 0.05); padding: 0.45rem 0.65rem; border-radius: 6px; font-size: 0.8rem; flex-wrap: wrap; gap: 0.4rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                          <span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc; font-weight: 700;">\${pIcon} \${p.platform} · \${p.arch}</span>
+                          <span class="mono" style="color: #f1f5f9; font-size: 0.8rem;">\${p.file_name}</span>
+                          <span style="color: var(--text-muted); font-size: 0.75rem;">\${p.file_size ? formatBytes(p.file_size) : ''}</span>
+                          \${pCleaned ? '<span class="badge badge-warning" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; font-size: 0.7rem;">安装包已清理</span>' : ''}
+                          \${pExternal ? \`<span class="badge" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 0.7rem;">🌐 \${p.use_proxy ? '反代外链' : '302外链'}</span>\` : '<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 0.7rem;">R2存储</span>'}
+                          <span style="color: var(--text-muted); font-size: 0.75rem;">下载: \${p.download_count || 0} 次</span>
+                        </div>
+                        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                          \${pCleaned ? '' : \`<button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.45rem;" onclick="copyText('\${pDownloadUrl}', '\${p.platform} (\${p.arch}) 下载链接已复制')">复制直链</button>\`}
+                          \${pCleaned ? '' : \`<a href="\${pDownloadUrl}" target="_blank" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.45rem; text-decoration: none;">直接下载</a>\`}
+                          \${p.id && !p.id.startsWith('pkg_def_') ? \`
+                            <button class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.45rem;" onclick="openEditPackageModal('\${p.id}', '\${v.app_id}')">编辑包</button>
+                            <button class="btn btn-danger btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.45rem;" onclick="deletePackage('\${p.id}', '\${v.app_id}')">删除包</button>
+                          \` : ''}
+                        </div>
+                      </div>
+                    \`;
+                  }).join('')}
+                </div>
+              </div>
+            \` : \`
+              <div style="margin-top: 0.6rem;">
+                <button class="btn btn-secondary btn-sm" style="font-size: 0.75rem;" onclick="openAddPackageModal('\${v.id}', '\${v.app_id}', '\${v.version_name}', \${v.version_code})">➕ 添加不同平台/架构安装包</button>
+              </div>
+            \`;
 
             return \`
               <div class="version-item" style="\${isCleaned ? 'opacity: 0.9; border-left: 3px solid #f59e0b;' : ''}">
-                <div class="ver-left">
+                <div class="ver-left" style="width: 100%;">
                   <div class="ver-header">
                     <span class="ver-title">v\${v.version_name}</span>
                     <span class="ver-code">(Code: \${v.version_code})</span>
                     <span class="badge badge-accent">\${v.channel}</span>
+                    \${v.platform ? \`<span class="badge" style="background: rgba(99, 102, 241, 0.2); color: #a5b4fc;">\${v.platform} · \${v.arch || 'universal'}</span>\` : ''}
                     \${v.is_force_update ? '<span class="badge badge-warning">强制更新</span>' : ''}
                     \${v.is_published ? '<span class="badge badge-success">已发布</span>' : '<span class="badge">已下架</span>'}
                     \${isCleaned ? '<span class="badge badge-warning" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;">📦 安装包已清理</span>' : ''}
@@ -2036,20 +2334,22 @@ val downloadReq = Request.Builder()
                   </div>
                   \${v.changelog ? \`<div class="ver-log">\${v.changelog}</div>\` : ''}
                   <div class="ver-meta">
-                    <span>文件: \${v.file_name || 'app.apk'} \${v.file_size ? \`(\${formatBytes(v.file_size)})\` : ''}</span>
-                    <span>下载量: \${v.download_count} 次</span>
+                    <span>主文件: \${v.file_name || 'app.apk'} \${v.file_size ? \`(\${formatBytes(v.file_size)})\` : ''}</span>
+                    <span>总下载: \${v.download_count} 次</span>
                     <span>发布于: \${v.created_at ? v.created_at.substring(0, 19).replace('T', ' ') : ''}</span>
                     \${v.file_md5 ? \`<span>MD5: \${v.file_md5}</span>\` : ''}
                     \${isExternal ? \`<span style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">外链: <a href="\${v.external_url}" target="_blank" style="color: #38bdf8;">\${v.external_url}</a></span>\` : ''}
                   </div>
                   \${isCleaned ? '<div style="font-size: 0.75rem; color: #fbbf24; margin-top: 4px;">⚠️ 该版本历史 APK 已被存储自动清理策略物理清理，历史发布记录完整保留。</div>' : ''}
+                  \${pkgsHtml}
                 </div>
 
-                <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-                  <button class="btn btn-secondary btn-sm" onclick="openEditVersionModal('\${v.id}', '\${v.app_id}')">编辑</button>
+                <div style="display: flex; gap: 0.5rem; align-items: flex-start; flex-wrap: wrap; margin-top: 0.5rem;">
+                  <button class="btn btn-secondary btn-sm" onclick="openAddPackageModal('\${v.id}', '\${v.app_id}', '\${v.version_name}', \${v.version_code})">➕ 添加安装包</button>
+                  <button class="btn btn-secondary btn-sm" onclick="openEditVersionModal('\${v.id}', '\${v.app_id}')">编辑版本</button>
                   \${isCleaned 
                     ? '<button class="btn btn-secondary btn-sm" disabled style="opacity: 0.5; cursor: not-allowed;" title="安装包已被自动策略清理">安装包已清理</button>'
-                    : \`<button class="btn btn-secondary btn-sm" onclick="copyText('\${downloadUrl}', '指定版本下载链接已复制')">复制下载链接</button>\`
+                    : \`<button class="btn btn-secondary btn-sm" onclick="copyText('\${defaultDlUrl}', '指定版本默认下载链接已复制')">复制默认下载链接</button>\`
                   }
                   <button class="btn btn-danger btn-sm" onclick="deleteVersion('\${v.id}', '\${v.app_id}')">删除记录</button>
                 </div>
@@ -2158,6 +2458,241 @@ val downloadReq = Request.Builder()
       }
     }
 
+    // Package Management Functions
+    let currentAddPkgMode = 'external';
+    let pendingAddPkgUploadResult = null;
+
+    function switchAddPkgMode(mode) {
+      currentAddPkgMode = mode;
+      const btnUpload = document.getElementById('add-pkg-mode-upload');
+      const btnExt = document.getElementById('add-pkg-mode-external');
+      const secUpload = document.getElementById('add-pkg-sec-upload');
+      const secExt = document.getElementById('add-pkg-sec-external');
+
+      if (btnUpload && btnExt && secUpload && secExt) {
+        if (mode === 'upload') {
+          btnUpload.className = 'btn btn-primary btn-sm';
+          btnExt.className = 'btn btn-secondary btn-sm';
+          secUpload.classList.remove('hidden');
+          secExt.classList.add('hidden');
+        } else {
+          btnUpload.className = 'btn btn-secondary btn-sm';
+          btnExt.className = 'btn btn-primary btn-sm';
+          secUpload.classList.add('hidden');
+          secExt.classList.remove('hidden');
+        }
+      }
+      checkAddPkgSubmitReady();
+    }
+
+    function checkAddPkgSubmitReady() {
+      const btn = document.getElementById('btn-add-pkg-submit');
+      if (!btn) return;
+      if (currentAddPkgMode === 'external') {
+        const extUrl = document.getElementById('add-pkg-exturl')?.value.trim();
+        btn.disabled = !extUrl;
+      } else {
+        btn.disabled = !pendingAddPkgUploadResult;
+      }
+    }
+
+    async function onAddPkgFileSelected(input) {
+      const file = input.files[0];
+      if (!file) return;
+      document.getElementById('drop-add-pkg-text').innerText = \`已选择: \${file.name} (\${formatBytes(file.size)})\`;
+      if (!document.getElementById('add-pkg-filename').value) {
+        document.getElementById('add-pkg-filename').value = file.name;
+      }
+      await uploadFileToR2(file, 'general', 'add-pkg-progress-wrap', 'add-pkg-progress-bar', 'add-pkg-upload-status', 'btn-add-pkg-submit');
+      pendingAddPkgUploadResult = pendingUploadResult;
+      checkAddPkgSubmitReady();
+    }
+
+    function openAddPackageModal(versionId, appId, versionName, versionCode) {
+      pendingAddPkgUploadResult = null;
+      document.getElementById('add-pkg-modal-title').innerText = \`添加分发安装包 - v\${versionName} (Code: \${versionCode})\`;
+      document.getElementById('add-pkg-verid').value = versionId;
+      document.getElementById('add-pkg-appid').value = appId;
+      document.getElementById('add-pkg-platform').value = 'windows';
+      document.getElementById('add-pkg-arch').value = 'x86_64';
+      document.getElementById('add-pkg-exturl').value = '';
+      document.getElementById('add-pkg-useproxy').checked = false;
+      document.getElementById('add-pkg-filename').value = '';
+      document.getElementById('add-pkg-filesize').value = '';
+      document.getElementById('drop-add-pkg-text').innerText = '点击或将安装包拖拽至此区域';
+      document.getElementById('add-pkg-progress-wrap').style.display = 'none';
+      document.getElementById('add-pkg-upload-status').innerText = '';
+      document.getElementById('file-add-pkg-input').value = '';
+      switchAddPkgMode('external');
+      openModal('modal-add-package');
+    }
+
+    async function handleAddPackage(e) {
+      e.preventDefault();
+      const versionId = document.getElementById('add-pkg-verid').value;
+      const appId = document.getElementById('add-pkg-appid').value;
+      const platform = document.getElementById('add-pkg-platform').value;
+      const arch = document.getElementById('add-pkg-arch').value;
+      const isExternalMode = currentAddPkgMode === 'external';
+      const extUrl = document.getElementById('add-pkg-exturl')?.value.trim();
+      const useProxy = document.getElementById('add-pkg-useproxy')?.checked ? 1 : 0;
+      const fileName = document.getElementById('add-pkg-filename')?.value.trim();
+      const fileSize = parseInt(document.getElementById('add-pkg-filesize')?.value, 10) || 0;
+
+      if (isExternalMode) {
+        if (!extUrl) {
+          showToast('请填写第三方下载直链', 'error');
+          return;
+        }
+        if (extUrl.startsWith(window.location.origin) || extUrl.includes('/api/v1/app/download')) {
+          showToast('第三方直链不能填写当前网关自身的 /api/v1/app/download 地址！', 'error');
+          return;
+        }
+      } else {
+        if (!pendingAddPkgUploadResult) {
+          showToast('请先选择并上传安装包文件', 'error');
+          return;
+        }
+      }
+
+      const payload = {
+        platform,
+        arch,
+        file_key: isExternalMode ? '' : pendingAddPkgUploadResult.file_key,
+        file_name: fileName || (isExternalMode ? \`app-\${platform}-\${arch}\` : pendingAddPkgUploadResult.file_name),
+        file_size: isExternalMode ? fileSize : pendingAddPkgUploadResult.file_size,
+        file_md5: isExternalMode ? undefined : pendingAddPkgUploadResult.file_md5,
+        external_url: isExternalMode ? extUrl : undefined,
+        use_proxy: isExternalMode ? useProxy : 0
+      };
+
+      const btn = document.getElementById('btn-add-pkg-submit');
+      btn.disabled = true;
+      btn.innerText = '正在添加...';
+
+      try {
+        const res = await apiRequest(\`/api/admin/versions/\${encodeURIComponent(versionId)}/packages\`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.code === 0) {
+          showToast('安装包添加成功！');
+          closeModal('modal-add-package');
+          const safeId = appId.replace(/\\./g, '_');
+          const box = document.getElementById('versions-box-' + safeId);
+          if (box) box.classList.add('hidden');
+          await toggleVersionsDrawer(appId);
+        } else {
+          showToast(data.message, 'error');
+        }
+      } catch (err) {
+        showToast('添加安装包失败: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '确认添加安装包';
+      }
+    }
+
+    function openEditPackageModal(packageId, appId) {
+      const versions = (window.__appVersions && window.__appVersions[appId]) || [];
+      let foundPkg = null;
+      for (const v of versions) {
+        if (v.packages) {
+          const p = v.packages.find(item => item.id === packageId);
+          if (p) {
+            foundPkg = p;
+            break;
+          }
+        }
+      }
+      if (!foundPkg) {
+        showToast('未找到该安装包记录', 'error');
+        return;
+      }
+
+      document.getElementById('edit-pkg-modal-title').innerText = \`编辑分发包 - \${foundPkg.platform} · \${foundPkg.arch}\`;
+      document.getElementById('edit-pkg-id').value = foundPkg.id;
+      document.getElementById('edit-pkg-appid').value = appId;
+      document.getElementById('edit-pkg-platform').value = foundPkg.platform || 'universal';
+      document.getElementById('edit-pkg-arch').value = foundPkg.arch || 'universal';
+      document.getElementById('edit-pkg-filename').value = foundPkg.file_name || '';
+      document.getElementById('edit-pkg-filesize').value = foundPkg.file_size || 0;
+      document.getElementById('edit-pkg-exturl').value = foundPkg.external_url || '';
+      document.getElementById('edit-pkg-useproxy').checked = foundPkg.use_proxy === 1;
+
+      openModal('modal-edit-package');
+    }
+
+    async function handleUpdatePackage(e) {
+      e.preventDefault();
+      const packageId = document.getElementById('edit-pkg-id').value;
+      const appId = document.getElementById('edit-pkg-appid').value;
+      const extUrl = document.getElementById('edit-pkg-exturl').value.trim();
+
+      if (extUrl && (extUrl.startsWith(window.location.origin) || extUrl.includes('/api/v1/app/download'))) {
+        showToast('第三方直链不能填写当前网关自身的 /api/v1/app/download 地址！', 'error');
+        return;
+      }
+
+      const payload = {
+        platform: document.getElementById('edit-pkg-platform').value,
+        arch: document.getElementById('edit-pkg-arch').value,
+        file_name: document.getElementById('edit-pkg-filename').value.trim(),
+        file_size: parseInt(document.getElementById('edit-pkg-filesize').value, 10) || 0,
+        external_url: extUrl || undefined,
+        use_proxy: document.getElementById('edit-pkg-useproxy').checked ? 1 : 0
+      };
+
+      const btn = document.getElementById('btn-edit-pkg-submit');
+      btn.disabled = true;
+      btn.innerText = '正在保存...';
+
+      try {
+        const res = await apiRequest(\`/api/admin/packages/\${encodeURIComponent(packageId)}\`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.code === 0) {
+          showToast('安装包更新成功！');
+          closeModal('modal-edit-package');
+          const safeId = appId.replace(/\\./g, '_');
+          const box = document.getElementById('versions-box-' + safeId);
+          if (box) box.classList.add('hidden');
+          await toggleVersionsDrawer(appId);
+        } else {
+          showToast(data.message, 'error');
+        }
+      } catch (err) {
+        showToast('更新失败: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = '保存修改';
+      }
+    }
+
+    async function deletePackage(packageId, appId) {
+      if (!confirm('确定要删除该分发安装包吗？若文件保存在 R2 存储中也将一并清理。')) return;
+      try {
+        const res = await apiRequest('/api/admin/packages/' + packageId, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.code === 0) {
+          showToast('安装包已删除');
+          const safeId = appId.replace(/\\./g, '_');
+          const box = document.getElementById('versions-box-' + safeId);
+          if (box) box.classList.add('hidden');
+          await toggleVersionsDrawer(appId);
+        } else {
+          showToast(data.message, 'error');
+        }
+      } catch (err) {
+        showToast('删除失败: ' + err.message, 'error');
+      }
+    }
+
     // Release Version Modal & Upload
     let currentPkgMode = 'upload';
     function switchPackageMode(mode) {
@@ -2200,6 +2735,8 @@ val downloadReq = Request.Builder()
       pendingUploadResult = null;
       document.getElementById('ver-modal-title').innerText = \`发布新版本 - \${appName}\`;
       document.getElementById('ver-form-appid').value = appId;
+      if (document.getElementById('ver-form-platform')) document.getElementById('ver-form-platform').value = 'android';
+      if (document.getElementById('ver-form-arch')) document.getElementById('ver-form-arch').value = 'universal';
       document.getElementById('ver-form-name').value = '';
       document.getElementById('ver-form-code').value = '';
       document.getElementById('ver-form-mincode').value = '0';
@@ -2353,6 +2890,8 @@ val downloadReq = Request.Builder()
       const channel = document.getElementById('ver-form-channel').value.trim() || 'default';
       const changelog = document.getElementById('ver-form-log').value.trim();
       const isForce = document.getElementById('ver-form-force').checked ? 1 : 0;
+      const platform = document.getElementById('ver-form-platform')?.value || 'android';
+      const arch = document.getElementById('ver-form-arch')?.value || 'universal';
 
       const payload = {
         version_name: versionName,
@@ -2362,10 +2901,12 @@ val downloadReq = Request.Builder()
         changelog,
         is_force_update: isForce,
         is_published: 1,
+        platform,
+        arch,
         external_url: isExternalMode ? extUrl : undefined,
         use_proxy: isExternalMode ? useProxy : 0,
         file_key: isExternalMode ? '' : pendingUploadResult.file_key,
-        file_name: isExternalMode ? (extFileName || ('app-v' + versionName + '.apk')) : pendingUploadResult.file_name,
+        file_name: isExternalMode ? (extFileName || (\`app-v\${versionName}-\${platform}-\${arch}\` + (platform === 'windows' ? '.zip' : '.apk'))) : pendingUploadResult.file_name,
         file_size: isExternalMode ? extSize : pendingUploadResult.file_size,
         file_md5: isExternalMode ? null : pendingUploadResult.file_md5
       };
@@ -2621,10 +3162,14 @@ val downloadReq = Request.Builder()
       const appId = document.getElementById('pg-app-select').value;
       const curVersion = document.getElementById('pg-cur-version').value;
       const channel = document.getElementById('pg-channel').value;
+      const platform = document.getElementById('pg-platform')?.value;
+      const arch = document.getElementById('pg-arch')?.value;
       const token = document.getElementById('pg-token').value.trim();
 
       const origin = window.location.origin;
       let url = \`\${origin}/api/v1/app/latest?app_id=\${encodeURIComponent(appId)}&version_code=\${curVersion}&channel=\${encodeURIComponent(channel)}\`;
+      if (platform) url += \`&platform=\${encodeURIComponent(platform)}\`;
+      if (arch) url += \`&arch=\${encodeURIComponent(arch)}\`;
       
       let cmd = \`curl -s "\${url}"\`;
       if (token) {
@@ -2644,9 +3189,14 @@ val downloadReq = Request.Builder()
 
       const curVersion = document.getElementById('pg-cur-version').value;
       const channel = document.getElementById('pg-channel').value;
+      const platform = document.getElementById('pg-platform')?.value;
+      const arch = document.getElementById('pg-arch')?.value;
       const token = document.getElementById('pg-token').value.trim();
 
       let url = \`/api/v1/app/latest?app_id=\${encodeURIComponent(appId)}&version_code=\${curVersion}&channel=\${encodeURIComponent(channel)}\`;
+      if (platform) url += \`&platform=\${encodeURIComponent(platform)}\`;
+      if (arch) url += \`&arch=\${encodeURIComponent(arch)}\`;
+
       const headers = {};
       if (token) headers['X-Ygg-Token'] = token;
 
@@ -2666,13 +3216,15 @@ val downloadReq = Request.Builder()
     const MCP_TOOLS_LIST = [
       { name: 'ygg_list_apps', desc: '列出所有托管应用与各渠道最新版本及下载统计', params: 'search? (string)' },
       { name: 'ygg_get_app_details', desc: '查看指定包名应用的详细配置与完整历史发布版本', params: 'app_id* (string)' },
-      { name: 'ygg_check_update', desc: '客户端更新检测模拟，返回版本比对与下载直链', params: 'app_id* (string), current_version_code? (number), channel? (string)' },
+      { name: 'ygg_check_update', desc: '客户端更新检测模拟，支持平台与架构匹配，返回直链与全包列表', params: 'app_id* (string), current_version_code? (number), channel? (string), platform? (string), arch? (string)' },
       { name: 'ygg_create_app', desc: '注册创建新应用项目', params: 'app_id* (string), name* (string), icon_url? (string), description? (string)' },
       { name: 'ygg_update_app', desc: '更新应用展示名称、图标链接或简介', params: 'app_id* (string), name? (string), icon_url? (string), description? (string)' },
       { name: 'ygg_delete_app', desc: '彻底删除应用及名下所有历史版本和 R2 存储文件', params: 'app_id* (string)' },
-      { name: 'ygg_publish_version', desc: '发布新版本（支持 GitHub/CDN 直链免上传与边缘反代加速）', params: 'app_id* (string), version_code* (number), version_name* (string), external_url? (string), use_proxy? (boolean)' },
+      { name: 'ygg_publish_version', desc: '发布新版本（支持多平台/架构、GitHub/CDN 直链免上传与边缘反代加速）', params: 'app_id* (string), version_code* (number), version_name* (string), platform? (string), arch? (string), external_url? (string), use_proxy? (boolean)' },
       { name: 'ygg_update_version', desc: '修改已有版本属性（更新日志、外链、反代、上架状态）', params: 'version_id* (string), changelog? (string), external_url? (string), use_proxy? (boolean)' },
       { name: 'ygg_delete_version', desc: '物理删除指定版本记录及对应的 R2 存储文件', params: 'version_id* (string)' },
+      { name: 'ygg_add_version_package', desc: '为指定版本新增不同平台或架构的分发安装包（如 Windows x64、Android ARM64）', params: 'version_id* (string), platform* (string), arch* (string), external_url? (string), use_proxy? (boolean)' },
+      { name: 'ygg_delete_version_package', desc: '删除指定版本名下的某个分发安装包并物理删除 R2 存储', params: 'package_id* (string)' },
       { name: 'ygg_get_system_stats', desc: '获取全局运行概况（总应用数、总版本数、累计下载量、存储占用）', params: '无参数' },
       { name: 'ygg_trigger_cleanup', desc: '触发旧版本存储清理（释放 R2 空间并保留历史记录）', params: 'days? (number), keep_latest? (number), force? (boolean)' },
       { name: 'ygg_list_files', desc: '查询通用文件管理列表中的所有资源', params: 'category? (string)' }
