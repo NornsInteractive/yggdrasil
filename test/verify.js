@@ -184,8 +184,10 @@ async function testAppRouting() {
   assert(rootHtml.includes('modal-edit-version'), 'Dashboard HTML should include edit version modal');
   assert(rootHtml.includes('openEditVersionModal'), 'Dashboard HTML should include openEditVersionModal function');
   assert(rootHtml.includes('cfg-github-token'), 'Dashboard HTML should include GitHub token setting input');
+  assert(rootHtml.includes('data-tab="mcp"'), 'Dashboard HTML should include MCP nav-tab');
+  assert(rootHtml.includes('id="tab-mcp"'), 'Dashboard HTML should include tab-mcp section');
   assert(typeof app.scheduled === 'function', 'Worker export must include scheduled handler for Cron triggers');
-  console.log('  ✅ GET /, /admin, /health routing, Edit Version UI, GitHub Token UI & scheduled cron handler verified.');
+  console.log('  ✅ GET /, /admin, /health routing, Edit Version UI, GitHub Token UI, MCP Hub UI & scheduled cron handler verified.');
 }
 
 console.log('▶ Test 8: Verifying Auto-Cleanup Service Logic (cutoff date & keep_latest filtering)');

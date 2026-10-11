@@ -727,6 +727,66 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
     .mono { font-family: var(--font-mono); }
     .truncate { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+    /* MCP Hub Styles */
+    .mcp-hero-banner {
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(59, 130, 246, 0.08) 100%);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      margin-bottom: 1.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.25rem;
+    }
+    .mcp-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .mcp-tool-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      transition: all 0.15s ease;
+    }
+    .mcp-tool-card:hover {
+      border-color: rgba(168, 85, 247, 0.45);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .mcp-client-tabs {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .mcp-client-btn {
+      padding: 0.45rem 0.9rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.825rem;
+      font-weight: 600;
+      transition: all 0.15s ease;
+    }
+    .mcp-client-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .mcp-client-btn.active {
+      color: #c084fc;
+      border-color: rgba(168, 85, 247, 0.5);
+      background: rgba(168, 85, 247, 0.12);
+    }
+
     @media (max-width: 768px) {
       header.navbar { padding: 0 1rem; }
       .nav-brand .brand-tag { display: none; }
@@ -780,6 +840,10 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
         <div class="nav-tab" data-tab="docs" onclick="switchTab('docs')">
           <span>📖</span> <span>API 文档</span>
         </div>
+        <div class="nav-tab" data-tab="mcp" onclick="switchTab('mcp')">
+          <span>🤖</span> <span>MCP / AI 协议</span>
+          <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; font-size: 0.65rem; padding: 0.1rem 0.35rem; margin-left: 0.2rem; border-radius: 999px;">新</span>
+        </div>
       </nav>
 
       <div class="nav-user">
@@ -828,7 +892,10 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
             <h2 class="section-title">应用与 APK 发布管理</h2>
             <p class="section-subtitle">支持多 App 统一托管、数字版本比对 (versionCode)、渠道隔离与断点续传</p>
           </div>
-          <div style="display: flex; gap: 0.5rem;">
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <button class="btn btn-secondary" onclick="switchTab('mcp')" style="border-color: rgba(168, 85, 247, 0.4); color: #c084fc;">
+              🤖 AI / MCP 助手
+            </button>
             <button class="btn btn-primary" onclick="openCreateAppModal()">+ 创建新应用</button>
           </div>
         </div>
@@ -1029,6 +1096,18 @@ export function renderDashboardHtml(siteTitle: string = 'Yggdrasil - 分发管�
           </div>
         </div>
 
+        <!-- MCP 快速跳转横幅 -->
+        <div style="background: linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(59, 130, 246, 0.08) 100%); border: 1px solid rgba(168, 85, 247, 0.35); border-radius: var(--radius-md); padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.5rem;">🤖</span>
+            <div>
+              <div style="font-weight: 700; font-size: 0.95rem; color: #c084fc;">需要使用 Cursor、Claude Desktop 等 AI 助手直接调用？</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">Yggdrasil 现已全面支持 Model Context Protocol (MCP) 开放标准，提供 12 项原生管理 Tools</div>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="switchTab('mcp')">前往 MCP 协议中心 ➔</button>
+        </div>
+
         <!-- 接口 1: 版本检测 -->
         <div class="stat-card" style="margin-bottom: 1.5rem;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
@@ -1193,6 +1272,151 @@ val downloadReq = Request.Builder()
     }
   }
 }</div>
+        </div>
+      </section>
+
+      <!-- TAB 6: MCP (Model Context Protocol) 协议接入中心 -->
+      <section id="tab-mcp" class="hidden">
+        <div class="mcp-hero-banner">
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.35rem; flex-wrap: wrap;">
+              <span style="font-size: 1.4rem;">🤖</span>
+              <h2 style="font-size: 1.3rem; font-weight: 800; margin: 0; letter-spacing: -0.02em;">Model Context Protocol (MCP) 智能调用中心</h2>
+              <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: #6ee7b7; font-weight: 700;">🟢 服务已就绪</span>
+              <span class="badge" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; font-weight: 700;">12 项原生 Tools</span>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0; max-width: 720px; line-height: 1.6;">
+              Yggdrasil 现已全面接入 MCP 开放协议标准！AI 助手（Cursor、Claude Desktop、Antigravity CLI、Windsurf、Cline 等）可原生感知并直接控制应用发版、版本检测、存储监控与旧包清理。
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+            <button class="btn btn-secondary" onclick="testMcpHandshake()">⚡ 实时测试 MCP 握手</button>
+            <button class="btn btn-primary" onclick="copyCurrentMcpConfig()">📋 复制客户端配置</button>
+          </div>
+        </div>
+
+        <!-- 服务端点概览卡片 -->
+        <div class="stat-card" style="margin-bottom: 1.5rem;">
+          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.75rem;">🌐 核心连接端点与参数</h3>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+            <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem;">
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">远程 HTTP JSON-RPC 端点</div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+                <code class="mono" id="mcp-endpoint-val" style="color: var(--primary); font-size: 0.85rem; word-break: break-all;">/api/mcp</code>
+                <button class="btn btn-secondary btn-sm" onclick="copyText(document.getElementById('mcp-endpoint-val').innerText, '端点 URL 已复制')">复制</button>
+              </div>
+            </div>
+            <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem;">
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">本地 STDIO CLI 执行命令</div>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+                <code class="mono" style="color: #c084fc; font-size: 0.85rem;">node dist/mcp-server.js</code>
+                <button class="btn btn-secondary btn-sm" onclick="copyText('node dist/mcp-server.js', '命令已复制')">复制</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 客户端一键配置卡片 -->
+        <div class="stat-card" style="margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 0.2rem;">🖥️ AI 客户端配置向导</h3>
+              <p style="color: var(--text-muted); font-size: 0.825rem; margin: 0;">点击下方标签切换不同 AI 客户端，获取自动注入当前站点域名与 Token 的专属配置</p>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="copyCurrentMcpConfig()">📋 复制当前代码</button>
+          </div>
+
+          <div class="mcp-client-tabs">
+            <button class="mcp-client-btn active" data-client="cursor" onclick="selectMcpClient('cursor')">🖥️ Cursor</button>
+            <button class="mcp-client-btn" data-client="claude" onclick="selectMcpClient('claude')">💬 Claude Desktop</button>
+            <button class="mcp-client-btn" data-client="agy" onclick="selectMcpClient('agy')">🚀 Antigravity CLI</button>
+            <button class="mcp-client-btn" data-client="windsurf" onclick="selectMcpClient('windsurf')">🏄 Windsurf / Cline</button>
+            <button class="mcp-client-btn" data-client="http" onclick="selectMcpClient('http')">🌐 cURL / HTTP RPC</button>
+          </div>
+
+          <div id="mcp-config-guide" style="color: var(--text-muted); font-size: 0.825rem; margin-bottom: 0.65rem; line-height: 1.5;"></div>
+          <div class="code-box" id="mcp-config-code" style="max-height: 280px; margin: 0; white-space: pre-wrap;"></div>
+        </div>
+
+        <!-- 在线测试 MCP 工具调用 -->
+        <div class="stat-card" style="margin-bottom: 1.5rem;">
+          <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 0.25rem;">🧪 在线 MCP 工具调用调试器</h3>
+          <p style="color: var(--text-muted); font-size: 0.825rem; margin-bottom: 1rem;">直接在浏览器中实时调用 12 项 MCP Tools，验证边缘执行与响应结果</p>
+
+          <div class="form-row">
+            <div class="form-col form-group">
+              <label class="form-label">选择测试工具</label>
+              <select id="mcp-test-tool-select" class="form-control" onchange="onMcpToolSelectChange()">
+                <option value="ygg_list_apps">ygg_list_apps (列出所有应用与发版概况)</option>
+                <option value="ygg_get_app_details">ygg_get_app_details (获取指定应用详情与版本历史)</option>
+                <option value="ygg_get_system_stats">ygg_get_system_stats (获取全局系统统计与存储占用)</option>
+                <option value="ygg_check_update">ygg_check_update (检测版本更新模拟)</option>
+                <option value="ygg_list_files">ygg_list_files (列出通用文件)</option>
+                <option value="ygg_trigger_cleanup">ygg_trigger_cleanup (执行旧版本存储清理)</option>
+              </select>
+            </div>
+            <div class="form-col form-group">
+              <label class="form-label">调用参数 JSON (arguments)</label>
+              <input type="text" id="mcp-test-tool-args" class="form-control mono" value="{}" placeholder="{}" />
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 0.75rem; align-items: center; margin-top: 0.5rem; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="runOnlineMcpToolTest()">🚀 发送调用请求</button>
+            <span id="mcp-test-status" style="font-size: 0.825rem; color: var(--text-muted);"></span>
+          </div>
+
+          <div style="margin-top: 1rem;">
+            <div style="font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.4rem;">返回结果 (JSON-RPC 2.0 Response)</div>
+            <div class="code-box" id="mcp-test-result" style="max-height: 240px; color: #a7f3d0;">// 点击上方“发送调用请求”测试工具返回结果</div>
+          </div>
+        </div>
+
+        <!-- 12 项 MCP 工具全览 (卡片 Bento 列表) -->
+        <div class="stat-card" style="margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 0.2rem;">🛠️ 原生可用 MCP Tools 全览 (共 12 项)</h3>
+              <p style="color: var(--text-muted); font-size: 0.825rem; margin: 0;">AI 代理连接后将自动识别以下能力，可在对话中直接指示 AI 调用</p>
+            </div>
+            <input type="text" id="mcp-tool-filter" class="form-control" style="width: 240px;" placeholder="🔍 快速过滤工具名称..." oninput="filterMcpToolCards(this.value)" />
+          </div>
+
+          <div class="mcp-grid" id="mcp-tools-container">
+            <!-- 动态渲染 12 项工具卡片 -->
+          </div>
+        </div>
+
+        <!-- 实用 AI 对话 Prompt 场景模版 -->
+        <div class="stat-card">
+          <h3 style="font-size: 1.05rem; font-weight: 700; margin-bottom: 0.25rem;">💡 常用 AI 指令模版 (开箱即用)</h3>
+          <p style="color: var(--text-muted); font-size: 0.825rem; margin-bottom: 1rem;">配置完成后，您可以直接在与 AI 对话中发出以下指令：</p>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+              <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 0.85rem; color: #c084fc; margin-bottom: 0.25rem;">📦 自动化版本发布</div>
+                <div class="mono" style="font-size: 0.825rem; color: var(--text-main);">“帮我将 Valhalla (com.norns.valhalla) 发布新版本 1.0.2，版本号为 10002，下载链接指向 GitHub Release 资产并开启边缘反代加速，更新日志写‘修复渲染卡顿’”</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="copyText('帮我将 Valhalla (com.norns.valhalla) 发布新版本 1.0.2，版本号为 10002，下载链接指向 GitHub Release 资产并开启边缘反代加速，更新日志写‘修复渲染卡顿’', 'Prompt 已复制')">复制 Prompt</button>
+            </div>
+
+            <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+              <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 0.85rem; color: #60a5fa; margin-bottom: 0.25rem;">🔍 状态巡检与版本体检</div>
+                <div class="mono" style="font-size: 0.825rem; color: var(--text-main);">“查询 Yggdrasil 当前管理的所有移动应用，列出每个应用最新版本名称、版本号与累计下载量”</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="copyText('查询 Yggdrasil 当前管理的所有移动应用，列出每个应用最新版本名称、版本号与累计下载量', 'Prompt 已复制')">复制 Prompt</button>
+            </div>
+
+            <div style="background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.85rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;">
+              <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 0.85rem; color: #34d399; margin-bottom: 0.25rem;">🧹 存储垃圾回收清理</div>
+                <div class="mono" style="font-size: 0.825rem; color: var(--text-main);">“帮我查看当前系统的存储占用情况，并触发清理 60 天前的历史旧版本，每个渠道至少保留最新的 2 个版本”</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="copyText('帮我查看当前系统的存储占用情况，并触发清理 60 天前的历史旧版本，每个渠道至少保留最新的 2 个版本', 'Prompt 已复制')">复制 Prompt</button>
+            </div>
+          </div>
         </div>
       </section>
     </main>
@@ -1521,7 +1745,7 @@ val downloadReq = Request.Builder()
       document.querySelectorAll('.nav-tab').forEach(el => {
         el.classList.toggle('active', el.getAttribute('data-tab') === tabId);
       });
-      ['apps', 'files', 'settings', 'playground', 'docs'].forEach(t => {
+      ['apps', 'files', 'settings', 'playground', 'docs', 'mcp'].forEach(t => {
         const el = document.getElementById('tab-' + t);
         if (el) el.classList.toggle('hidden', t !== tabId);
       });
@@ -1530,6 +1754,7 @@ val downloadReq = Request.Builder()
       if (tabId === 'files') loadFiles();
       if (tabId === 'settings') loadSettings();
       if (tabId === 'playground') setupPlayground();
+      if (tabId === 'mcp') renderMcpTab();
     }
 
     // API Helper with credentials
@@ -2433,6 +2658,237 @@ val downloadReq = Request.Builder()
         document.getElementById('pg-response').innerText = JSON.stringify(data, null, 2);
       } catch (err) {
         document.getElementById('pg-response').innerText = '请求出错: ' + err.message;
+      }
+    }
+
+    // MCP Hub Functionality
+    let currentMcpClient = 'cursor';
+    const MCP_TOOLS_LIST = [
+      { name: 'ygg_list_apps', desc: '列出所有托管应用与各渠道最新版本及下载统计', params: 'search? (string)' },
+      { name: 'ygg_get_app_details', desc: '查看指定包名应用的详细配置与完整历史发布版本', params: 'app_id* (string)' },
+      { name: 'ygg_check_update', desc: '客户端更新检测模拟，返回版本比对与下载直链', params: 'app_id* (string), current_version_code? (number), channel? (string)' },
+      { name: 'ygg_create_app', desc: '注册创建新应用项目', params: 'app_id* (string), name* (string), icon_url? (string), description? (string)' },
+      { name: 'ygg_update_app', desc: '更新应用展示名称、图标链接或简介', params: 'app_id* (string), name? (string), icon_url? (string), description? (string)' },
+      { name: 'ygg_delete_app', desc: '彻底删除应用及名下所有历史版本和 R2 存储文件', params: 'app_id* (string)' },
+      { name: 'ygg_publish_version', desc: '发布新版本（支持 GitHub/CDN 直链免上传与边缘反代加速）', params: 'app_id* (string), version_code* (number), version_name* (string), external_url? (string), use_proxy? (boolean)' },
+      { name: 'ygg_update_version', desc: '修改已有版本属性（更新日志、外链、反代、上架状态）', params: 'version_id* (string), changelog? (string), external_url? (string), use_proxy? (boolean)' },
+      { name: 'ygg_delete_version', desc: '物理删除指定版本记录及对应的 R2 存储文件', params: 'version_id* (string)' },
+      { name: 'ygg_get_system_stats', desc: '获取全局运行概况（总应用数、总版本数、累计下载量、存储占用）', params: '无参数' },
+      { name: 'ygg_trigger_cleanup', desc: '触发旧版本存储清理（释放 R2 空间并保留历史记录）', params: 'days? (number), keep_latest? (number), force? (boolean)' },
+      { name: 'ygg_list_files', desc: '查询通用文件管理列表中的所有资源', params: 'category? (string)' }
+    ];
+
+    function renderMcpTab() {
+      const origin = window.location.origin;
+      const endpointEl = document.getElementById('mcp-endpoint-val');
+      if (endpointEl) endpointEl.innerText = origin + '/api/mcp';
+      selectMcpClient(currentMcpClient);
+      renderMcpToolCards(MCP_TOOLS_LIST);
+    }
+
+    function renderMcpToolCards(tools) {
+      const container = document.getElementById('mcp-tools-container');
+      if (!container) return;
+      container.innerHTML = tools.map(t => \`
+        <div class="mcp-tool-card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
+            <div>
+              <span class="badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; font-weight: 700; font-size: 0.7rem;">Tool</span>
+              <div class="mono" style="font-weight: 700; font-size: 0.925rem; color: #a7f3d0; margin-top: 0.25rem;">\${t.name}</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="copyText('\${t.name}', '工具名已复制')">复制名</button>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-main); line-height: 1.5;">\${t.desc}</div>
+          <div style="font-size: 0.725rem; color: var(--text-muted); background: rgba(0,0,0,0.25); padding: 0.35rem 0.6rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+            <span style="color: #93c5fd; font-weight: 600;">参数:</span> <span class="mono">\${t.params}</span>
+          </div>
+        </div>
+      \`).join('');
+    }
+
+    function filterMcpToolCards(keyword) {
+      const kw = (keyword || '').trim().toLowerCase();
+      if (!kw) {
+        renderMcpToolCards(MCP_TOOLS_LIST);
+        return;
+      }
+      const filtered = MCP_TOOLS_LIST.filter(t => t.name.toLowerCase().includes(kw) || t.desc.toLowerCase().includes(kw));
+      renderMcpToolCards(filtered);
+    }
+
+    function selectMcpClient(client) {
+      currentMcpClient = client;
+      document.querySelectorAll('.mcp-client-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-client') === client);
+      });
+
+      const origin = window.location.origin;
+      const token = (settingsData && settingsData['api_fixed_token']) || 'ygg_secret_token_default_2026';
+      const codeEl = document.getElementById('mcp-config-code');
+      const guideEl = document.getElementById('mcp-config-guide');
+      if (!codeEl || !guideEl) return;
+
+      if (client === 'cursor') {
+        guideEl.innerHTML = '在 <b>Cursor</b> 设置中点击 <b>Settings -> Features -> MCP</b>，点击 <b>+ Add New MCP Server</b>，选择 <b>command</b> 类型，或在 <code class="mono">~/.cursor/mcp.json</code> 中粘贴：';
+        codeEl.innerText = JSON.stringify({
+          mcpServers: {
+            yggdrasil: {
+              command: "node",
+              args: ["/绝对路径/dist/mcp-server.js"],
+              env: {
+                YGG_ENDPOINT: origin,
+                YGG_TOKEN: token
+              }
+            }
+          }
+        }, null, 2);
+      } else if (client === 'claude') {
+        guideEl.innerHTML = '在 <b>Claude Desktop</b> 配置文件中配置（macOS: <code class="mono">~/Library/Application Support/Claude/claude_desktop_config.json</code>，Windows: <code class="mono">%APPDATA%\\\\Claude\\\\claude_desktop_config.json</code>）：';
+        codeEl.innerText = JSON.stringify({
+          mcpServers: {
+            yggdrasil: {
+              command: "node",
+              args: ["/绝对路径/dist/mcp-server.js"],
+              env: {
+                YGG_ENDPOINT: origin,
+                YGG_TOKEN: token
+              }
+            }
+          }
+        }, null, 2);
+      } else if (client === 'agy') {
+        guideEl.innerHTML = '在 <b>Google Antigravity CLI</b> 配置文件中声明（支持全局或项目级别 mcpServers 配置）：';
+        codeEl.innerText = JSON.stringify({
+          mcpServers: {
+            yggdrasil: {
+              command: "node",
+              args: ["dist/mcp-server.js"],
+              env: {
+                YGG_ENDPOINT: origin,
+                YGG_TOKEN: token
+              }
+            }
+          }
+        }, null, 2);
+      } else if (client === 'windsurf') {
+        guideEl.innerHTML = '在 <b>Windsurf</b> 或 <b>Cline</b> 扩展的 MCP 配置文件中添加：';
+        codeEl.innerText = JSON.stringify({
+          mcpServers: {
+            yggdrasil: {
+              command: "node",
+              args: ["dist/mcp-server.js"],
+              env: {
+                YGG_ENDPOINT: origin,
+                YGG_TOKEN: token
+              }
+            }
+          }
+        }, null, 2);
+      } else if (client === 'http') {
+        guideEl.innerHTML = '直接通过 <b>HTTP POST</b> 远程调用边缘端点，协议格式为标准 <b>JSON-RPC 2.0</b>：';
+        codeEl.innerText = \`curl -X POST \${origin}/api/mcp \\\\
+  -H "Content-Type: application/json" \\\\
+  -H "X-Ygg-Token: \${token}" \\\\
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "tools/call",
+    "params": {
+      "name": "ygg_list_apps",
+      "arguments": {}
+    }
+  }'\`;
+      }
+    }
+
+    function copyCurrentMcpConfig() {
+      const code = document.getElementById('mcp-config-code').innerText;
+      copyText(code, '客户端 MCP 配置已复制到剪贴板');
+    }
+
+    async function testMcpHandshake() {
+      showToast('正在向 /api/mcp 发送协议握手测试...');
+      try {
+        const res = await fetch('/api/mcp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: 'initialize',
+            params: {
+              protocolVersion: '2024-11-05',
+              capabilities: {},
+              clientInfo: { name: 'Yggdrasil-Dashboard', version: '1.0.0' }
+            }
+          })
+        });
+        const data = await res.json();
+        if (data.result && data.result.serverInfo) {
+          showToast(\`✅ MCP 握手成功！服务: \${data.result.serverInfo.name} v\${data.result.serverInfo.version}\`);
+        } else {
+          showToast('⚠️ MCP 响应格式异常: ' + JSON.stringify(data), 'error');
+        }
+      } catch (e) {
+        showToast('❌ MCP 握手失败: ' + e.message, 'error');
+      }
+    }
+
+    function onMcpToolSelectChange() {
+      const tool = document.getElementById('mcp-test-tool-select').value;
+      const argsInput = document.getElementById('mcp-test-tool-args');
+      if (tool === 'ygg_list_apps') argsInput.value = '{}';
+      else if (tool === 'ygg_get_app_details') argsInput.value = '{"app_id": "com.norns.valhalla"}';
+      else if (tool === 'ygg_get_system_stats') argsInput.value = '{}';
+      else if (tool === 'ygg_check_update') argsInput.value = '{"app_id": "com.norns.valhalla", "current_version_code": 0}';
+      else if (tool === 'ygg_list_files') argsInput.value = '{"category": "general"}';
+      else if (tool === 'ygg_trigger_cleanup') argsInput.value = '{"days": 90, "keep_latest": 3, "force": false}';
+    }
+
+    async function runOnlineMcpToolTest() {
+      const tool = document.getElementById('mcp-test-tool-select').value;
+      const rawArgs = document.getElementById('mcp-test-tool-args').value.trim() || '{}';
+      const statusEl = document.getElementById('mcp-test-status');
+      const resultEl = document.getElementById('mcp-test-result');
+
+      let argsObj = {};
+      try {
+        argsObj = JSON.parse(rawArgs);
+      } catch (e) {
+        showToast('参数 JSON 格式解析错误', 'error');
+        return;
+      }
+
+      statusEl.innerText = '⏳ 请求中...';
+      resultEl.innerText = '// 执行中...';
+
+      const token = (settingsData && settingsData['api_fixed_token']) || '';
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['X-Ygg-Token'] = token;
+
+      try {
+        const res = await fetch('/api/mcp', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: Date.now(),
+            method: 'tools/call',
+            params: {
+              name: tool,
+              arguments: argsObj
+            }
+          })
+        });
+
+        const data = await res.json();
+        statusEl.innerText = \`HTTP \${res.status}\`;
+        resultEl.innerText = JSON.stringify(data, null, 2);
+        showToast('MCP 工具调用成功');
+      } catch (err) {
+        statusEl.innerText = '调用失败';
+        resultEl.innerText = 'Error: ' + err.message;
+        showToast('调用失败: ' + err.message, 'error');
       }
     }
 
